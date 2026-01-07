@@ -392,10 +392,6 @@ const TaskDetails = () => {
                     </div>
                     <div>
                       <p className="font-semibold text-jira-gray dark:text-[var(--text-primary)]">{assigneeDisplayName}</p>
-                      <p className="text-xs text-gray-500 dark:text-[var(--text-secondary)]">{assigneeEmail}</p>
-                      {assignee.username && (
-                        <p className="text-[11px] text-gray-400 dark:text-[var(--text-secondary)]/80">@{assignee.username}</p>
-                      )}
                     </div>
                   </div>
                 ) : (
@@ -413,7 +409,7 @@ const TaskDetails = () => {
                         type="text"
                         value={assigneeSearch}
                         onChange={(e) => setAssigneeSearch(e.target.value)}
-                        placeholder="Search people by name or email..."
+                        placeholder="Search people by name..."
                         className="flex-1 bg-transparent text-sm px-3 text-gray-700 dark:text-[var(--text-primary)] placeholder-gray-400 focus:outline-none"
                       />
                       {assigneeSearch && (
@@ -451,7 +447,6 @@ const TaskDetails = () => {
                             </div>
                             <div>
                               <p className="text-sm font-semibold text-jira-gray dark:text-[var(--text-primary)]">{userOption.name}</p>
-                              <p className="text-xs text-gray-500 dark:text-[var(--text-secondary)]">{userOption.email}</p>
                             </div>
                           </div>
                           {assignee && assignee.username && assignee.username === userOption.username && (

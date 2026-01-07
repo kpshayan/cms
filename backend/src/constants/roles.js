@@ -18,7 +18,6 @@ const EXECUTOR_ROLE_BLUEPRINT = {
 const ROLE_DEFINITIONS = {
   admin1: {
     displayName: 'Admin One',
-    email: 'admin1@projectflow.io',
     role: 'FULL_ACCESS',
     scope: 'Full workspace access',
     avatar: 'A1',
@@ -32,7 +31,6 @@ const ROLE_DEFINITIONS = {
   },
   admin2: {
     displayName: 'Admin Two',
-    email: 'admin2@projectflow.io',
     role: 'TASK_EDITOR',
     scope: 'Task editing only',
     avatar: 'A2',
@@ -46,7 +44,6 @@ const ROLE_DEFINITIONS = {
   },
   admin4: {
     displayName: 'Admin Four',
-    email: 'admin4@projectflow.io',
     role: 'PROJECT_READ_ONLY',
     scope: 'Workspace read-only',
     avatar: 'A4',

@@ -150,12 +150,7 @@ const Sidebar = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-jira-gray truncate dark:text-gray-100">{user.name}</p>
-                <p className="text-xs text-gray-600 truncate dark:text-gray-300">{user.email}</p>
-                {user.role && (
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-jira-blue mt-1 dark:text-blue-200">
-                    {user.role.replace(/_/g, ' ')}
-                  </p>
-                )}
+                {/* role intentionally hidden per requirements */}
               </div>
             </div>
           </div>

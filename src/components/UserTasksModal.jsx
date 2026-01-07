@@ -141,7 +141,6 @@ const UserTasksModal = ({ isOpen, onClose, user, tasks, onEditTask, canEditTasks
                 </div>
                 <div>
                   <h2 className="text-3xl font-bold mb-1 hover:scale-105 transition-transform duration-300">{user.name}</h2>
-                  <p className="text-blue-100 text-sm">{user.email}</p>
                 </div>
               </div>
               

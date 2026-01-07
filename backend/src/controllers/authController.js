@@ -51,7 +51,6 @@ const serializeAccount = (accountDoc) => {
     id: account._id,
     username: account.username,
     name: account.displayName,
-    email: account.email,
     role: account.role,
     scope: account.scope,
     avatar: account.avatar,
@@ -89,7 +88,6 @@ exports.signup = asyncHandler(async (req, res) => {
     account = new Account({
       username,
       displayName: roleProfile.displayName,
-      email: roleProfile.email,
       role: roleProfile.role,
       scope: roleProfile.scope,
       avatar: roleProfile.avatar,
@@ -195,7 +193,7 @@ exports.createExecutor = asyncHandler(async (req, res) => {
   const account = new Account({
     username: finalUsername,
     displayName: trimmedName,
-    email: (email || `${finalUsername}@projectflow.io`).trim().toLowerCase(),
+    ...(email ? { email: String(email).trim().toLowerCase() } : {}),
     role: EXECUTOR_ROLE_BLUEPRINT.role,
     scope: EXECUTOR_ROLE_BLUEPRINT.scope,
     avatar: (trimmedName || 'EX').slice(0, 2).toUpperCase(),

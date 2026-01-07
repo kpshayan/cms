@@ -35,6 +35,7 @@ const Summary = () => {
     user: authUser,
     registerExecutorAccount,
   } = useAuth();
+  const isAdminOne = authUser?.username === 'admin1';
   
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -60,10 +61,10 @@ const Summary = () => {
   const quotationEntries = quotations?.entries || [];
   const hasQuotations = quotationEntries.length > 0;
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || !isAdminOne) return;
     loadQuotationsForProject(projectId).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, isAdminOne]);
 
   const ensureQuotationsBlob = async () => {
     if (quotations?.pdfBlob) {
@@ -209,17 +210,10 @@ const Summary = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
         <StatCard
           icon={Activity}
-          title="Total Tasks"
-          value={tasks.length}
-          subtitle={`${todoTasks} waiting to start`}
+          title="To Do"
+          value={todoTasks}
+          subtitle="Waiting to start"
           color="bg-gradient-to-br from-jira-blue to-jira-blue-light"
-        />
-        <StatCard
-          icon={CheckCircle2}
-          title="Completed"
-          value={completedTasks}
-          subtitle={`${tasks.length} total tasks`}
-          color="bg-gradient-to-br from-green-500 to-green-600"
         />
         <StatCard
           icon={Clock}
@@ -235,9 +229,16 @@ const Summary = () => {
           subtitle="Blocked or paused"
           color="bg-gradient-to-br from-gray-500 to-gray-600"
         />
+        <StatCard
+          icon={CheckCircle2}
+          title="Done"
+          value={completedTasks}
+          subtitle="Finished"
+          color="bg-gradient-to-br from-green-500 to-green-600"
+        />
       </div>
 
-      {hasQuotations && (
+      {isAdminOne && hasQuotations && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -351,7 +352,6 @@ const Summary = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-jira-gray text-sm truncate group-hover:text-jira-blue transition-colors">{user.name}</p>
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
