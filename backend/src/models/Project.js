@@ -7,6 +7,16 @@ const quotationEntrySchema = new mongoose.Schema({
   type: { type: String, trim: true },
 }, { _id: false });
 
+const quotationVersionSchema = new mongoose.Schema({
+  entries: { type: [quotationEntrySchema], default: [] },
+  generatedAt: { type: Date },
+  pdfName: { type: String, trim: true },
+  pdfData: {
+    data: Buffer,
+    contentType: { type: String, default: 'application/pdf' },
+  },
+}, { timestamps: true });
+
 const projectSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   key: { type: String, required: true, uppercase: true, unique: true },
@@ -23,6 +33,7 @@ const projectSchema = new mongoose.Schema({
       contentType: { type: String, default: 'application/pdf' },
     },
   },
+  quotationVersions: { type: [quotationVersionSchema], default: [] },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Project', projectSchema);

@@ -85,7 +85,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const ensureAdmin1 = () => {
-    if (user?.username !== 'admin1') {
+    if (user?.role !== 'FULL_ACCESS') {
       const err = new Error('Only admin1 can manage executor accounts.');
       setError(err.message);
       throw err;

@@ -87,7 +87,7 @@ const Signup = () => {
             </Link>
             <h1 className="text-3xl font-bold text-jira-gray dark:text-white mb-3">Sign up for access</h1>
             <p className="text-gray-600 dark:text-gray-300 max-w-lg">
-              Use admin1, admin2, admin4, or the admin3-* username that admin1 created for you. Roles are assigned automatically and every password is hashed before storage.
+              Sign up with your name/username that an admin has added to the access list. Roles are assigned automatically and every password is hashed before storage.
             </p>
           </div>
 
@@ -125,7 +125,7 @@ const Signup = () => {
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-2 dark:text-gray-400">
-                  Admin1/admin2/admin4 are static. Admin3 teammates must use the exact admin3-* username provisioned by admin1.
+                  If signup fails, ask an admin to add your name to the access list.
                 </p>
               </div>
 

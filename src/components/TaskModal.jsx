@@ -6,17 +6,66 @@ import { useAuth } from '../context/AuthContext';
 
 const normalizeUsername = (value = '') => value.trim().toLowerCase();
 
+const buildAvatarFromName = (name = '', providedAvatar = '') => {
+  if (providedAvatar?.trim()) {
+    return providedAvatar.trim().slice(0, 2).toUpperCase();
+  }
+
+  const initials = (name || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || 'TM';
+};
+
 const TaskModal = ({ isOpen, onClose, task = null, projectId }) => {
   const { addTask, updateTask, getProjectById } = useData();
   const { executors } = useAuth();
   const project = getProjectById(projectId);
+
+  const assigneeOptions = (() => {
+    const options = [];
+    const seen = new Set();
+
+    const pushIfValid = (candidate) => {
+      const username = normalizeUsername(candidate?.username || '');
+      if (!username) return;
+      if (seen.has(username)) return;
+      seen.add(username);
+      options.push({
+        username,
+        name: candidate?.name || candidate?.username || username,
+        email: candidate?.email || '',
+        avatar: candidate?.avatar || buildAvatarFromName(candidate?.name || username, candidate?.avatar),
+      });
+    };
+
+    (executors || []).forEach(pushIfValid);
+
+    const team = Array.isArray(project?.team) ? project.team : [];
+    team.forEach((member) => {
+      const derivedUsername = member?.executorUsername || member?.username || member?.email || member?.name;
+      pushIfValid({
+        username: derivedUsername,
+        name: member?.name || derivedUsername,
+        email: member?.email || '',
+        avatar: member?.avatar || buildAvatarFromName(member?.name || derivedUsername, member?.avatar),
+      });
+    });
+
+    return options;
+  })();
 
   const buildInitialTaskState = (overrides = {}) => ({
     title: '',
     description: '',
     status: 'todo',
     priority: 'medium',
-    assignee: overrides.assignee ?? executors[0] ?? null,
+    assignee: overrides.assignee ?? assigneeOptions[0] ?? null,
     projectId,
     projectKey: project?.key || 'TASK',
     type: 'task',
@@ -46,7 +95,7 @@ const TaskModal = ({ isOpen, onClose, task = null, projectId }) => {
       setFormData(buildInitialTaskState());
       setUploadedFiles([]);
     }
-  }, [task, isOpen, projectId, project?.key, executors]);
+  }, [task, isOpen, projectId, project?.key, executors, project?.team]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -77,7 +126,7 @@ const TaskModal = ({ isOpen, onClose, task = null, projectId }) => {
     const name = e.target.name;
     
     if (name === 'assignee') {
-      const selectedUser = executors.find(u => normalizeUsername(u.username) === normalizeUsername(value));
+      const selectedUser = assigneeOptions.find(u => normalizeUsername(u.username) === normalizeUsername(value));
       setFormData({ ...formData, assignee: selectedUser || null });
     } else {
       setFormData({ ...formData, [name]: value });
@@ -302,15 +351,15 @@ const TaskModal = ({ isOpen, onClose, task = null, projectId }) => {
             value={formData.assignee?.username || ''}
             onChange={handleChange}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-jira-blue focus:border-transparent"
-            disabled={!executors.length}
+            disabled={!assigneeOptions.length}
           >
-            <option value="">Select an executor...</option>
-            {executors.map(user => (
+            <option value="">Select a team member...</option>
+            {assigneeOptions.map(user => (
               <option key={user.username} value={user.username}>{user.name} ({user.username})</option>
             ))}
           </select>
-          {!executors.length && (
-            <p className="text-xs text-red-500 mt-2">Add an executor (admin3-*) from the dashboard before assigning tasks.</p>
+          {!assigneeOptions.length && (
+            <p className="text-xs text-red-500 mt-2">Add a team member to this project before assigning tasks.</p>
           )}
           {formData.assignee && (
             <div className="mt-2 flex items-center space-x-2 text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">

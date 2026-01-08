@@ -467,6 +467,15 @@ export const DataProvider = ({ children }) => {
         pdfName: payload.pdfName,
         pdfBase64: payload.pdfBase64,
       });
+
+      if (response?.quotationVersions) {
+        setProjects((prev) => prev.map((project) => (
+          String(project?._id || project?.id) === String(projectId)
+            ? { ...project, quotationVersions: response.quotationVersions }
+            : project
+        )));
+      }
+
       return upsertQuotationsState(projectId, {
         entries: response?.entries || payload.entries || [],
         generatedAt: response?.generatedAt || payload.generatedAt,
@@ -505,6 +514,18 @@ export const DataProvider = ({ children }) => {
           pdfAvailable: true,
         },
       }));
+      return blob;
+    } catch (err) {
+      return handleBackendError(err, 'Failed to fetch quotations PDF.');
+    }
+  };
+
+  const fetchQuotationVersionPdf = async (projectId, versionId) => {
+    const key = normalizeProjectId(projectId);
+    if (!key) return null;
+    if (!versionId) return null;
+    try {
+      const blob = await projectAPI.downloadQuotationVersionPdf(projectId, versionId);
       return blob;
     } catch (err) {
       return handleBackendError(err, 'Failed to fetch quotations PDF.');
@@ -662,6 +683,7 @@ export const DataProvider = ({ children }) => {
       loadQuotationsForProject,
       getQuotationsForProject,
       fetchQuotationsPdf,
+      fetchQuotationVersionPdf,
     }}>
       {children}
     </DataContext.Provider>

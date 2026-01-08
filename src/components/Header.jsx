@@ -10,7 +10,7 @@ const Header = () => {
   const project = getProjectById(id);
   const projectColor = project?.color || '#0052CC';
   const projectKey = project?.key || 'PRJ';
-  const isAdminOne = user?.username === 'admin1';
+  const isAdminOne = user?.role === 'FULL_ACCESS';
 
   const navItems = [
     { to: `/dashboard/project/${id}/summary`, label: 'Summary', icon: LayoutDashboard },

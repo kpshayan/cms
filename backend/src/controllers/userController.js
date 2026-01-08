@@ -1,6 +1,9 @@
 const TeamMember = require('../models/TeamMember');
 const Project = require('../models/Project');
+const AccessGroup = require('../models/AccessGroup');
 const asyncHandler = require('../utils/asyncHandler');
+
+const normalizeUsername = (value = '') => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 const serializeUser = (doc) => {
   const plain = doc.toObject({ versionKey: false });
@@ -46,6 +49,11 @@ exports.createUser = asyncHandler(async (req, res) => {
     payload.executorUsername = payload.executorUsername.trim().toLowerCase();
   }
 
+  // New flow: username is derived from the team member name.
+  // This becomes the executor login username and is added to admin3 allowlist.
+  const derivedUsername = normalizeUsername(payload.name);
+  payload.executorUsername = derivedUsername;
+
   if (!payload.avatar && payload.name) {
     payload.avatar = payload.name
       .split(' ')
@@ -55,6 +63,17 @@ exports.createUser = asyncHandler(async (req, res) => {
       .slice(0, 2)
       .toUpperCase();
   }
+
+  // Ensure allowlist group exists and add derived username.
+  await AccessGroup.updateOne(
+    { key: 'admin3' },
+    { $setOnInsert: { key: 'admin3', usernames: [] } },
+    { upsert: true }
+  );
+  await AccessGroup.updateOne(
+    { key: 'admin3' },
+    { $addToSet: { usernames: derivedUsername } }
+  );
 
   const user = await TeamMember.create(payload);
   return res.status(201).json(serializeUser(user));

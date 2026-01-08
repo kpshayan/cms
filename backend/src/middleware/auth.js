@@ -46,7 +46,8 @@ const requireAnyPermission = (...permissionKeys) => (req, res, next) => {
 };
 
 const requireAdmin1 = (req, res, next) => {
-  if (req.user?.username !== 'admin1') {
+  // Admin1 “group” members share the same FULL_ACCESS role.
+  if (req.user?.role !== 'FULL_ACCESS') {
     return res.status(403).json({ error: 'Only admin1 can perform this action' });
   }
   return next();

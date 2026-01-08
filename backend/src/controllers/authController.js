@@ -1,15 +1,141 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Account = require('../models/Account');
+const AccessGroup = require('../models/AccessGroup');
 const asyncHandler = require('../utils/asyncHandler');
 const {
   ROLE_DEFINITIONS,
   EXECUTOR_ROLE_BLUEPRINT,
   EXECUTOR_USERNAME_PREFIX,
-  getRoleProfile,
 } = require('../constants/roles');
 
-const normalizeUsername = (value = '') => value.trim().toLowerCase();
+const normalizeUsername = (value = '') => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const isLegacyExecutorUsername = (username) => String(username || '').toLowerCase().startsWith(EXECUTOR_USERNAME_PREFIX);
+
+const loadGroups = async () => {
+  const docs = await AccessGroup.find({ key: { $in: ['admin1', 'admin2', 'admin3', 'admin4'] } });
+  const map = { admin1: [], admin2: [], admin3: [], admin4: [] };
+  for (const doc of docs) {
+    map[doc.key] = Array.isArray(doc.usernames) ? doc.usernames : [];
+  }
+  return map;
+};
+
+const isAllowedUsername = (username, groups) => {
+  const normalized = normalizeUsername(username);
+  if (!normalized) return false;
+  const list = (arr) => (Array.isArray(arr) ? arr : []).map(normalizeUsername);
+  return (
+    list(groups.admin1).includes(normalized)
+    || list(groups.admin2).includes(normalized)
+    || list(groups.admin3).includes(normalized)
+    || list(groups.admin4).includes(normalized)
+  );
+};
+
+const resolveProfileFromGroups = (username, groups) => {
+  const normalized = normalizeUsername(username);
+  const list = (arr) => (Array.isArray(arr) ? arr : []).map(normalizeUsername);
+  if (list(groups.admin1).includes(normalized)) {
+    const template = ROLE_DEFINITIONS.admin1;
+    return {
+      displayName: normalized,
+      role: template.role,
+      scope: template.scope,
+      avatar: normalized.slice(0, 2).toUpperCase(),
+      permissions: template.permissions,
+      isExecutor: false,
+    };
+  }
+
+  if (list(groups.admin2).includes(normalized)) {
+    const template = ROLE_DEFINITIONS.admin2;
+    return {
+      displayName: normalized,
+      role: template.role,
+      scope: template.scope,
+      avatar: normalized.slice(0, 2).toUpperCase(),
+      permissions: template.permissions,
+      isExecutor: false,
+    };
+  }
+
+  if (list(groups.admin3).includes(normalized)) {
+    return {
+      displayName: normalized,
+      role: EXECUTOR_ROLE_BLUEPRINT.role,
+      scope: EXECUTOR_ROLE_BLUEPRINT.scope,
+      avatar: normalized.slice(0, 2).toUpperCase() || 'EX',
+      permissions: EXECUTOR_ROLE_BLUEPRINT.permissions,
+      isExecutor: true,
+    };
+  }
+
+  if (list(groups.admin4).includes(normalized)) {
+    const template = ROLE_DEFINITIONS.admin4;
+    return {
+      displayName: normalized,
+      role: template.role,
+      scope: template.scope,
+      avatar: normalized.slice(0, 2).toUpperCase(),
+      permissions: template.permissions,
+      isExecutor: false,
+    };
+  }
+
+  return null;
+};
+
+const syncAccountFromProfile = async (account, profile) => {
+  if (!account || !profile) return account;
+
+  let mutated = false;
+  const nextDisplayName = profile.displayName;
+  const nextRole = profile.role;
+  const nextScope = profile.scope;
+  const nextAvatar = profile.avatar;
+  const nextPermissions = profile.permissions;
+  const nextIsExecutor = Boolean(profile.isExecutor);
+
+  if (account.displayName !== nextDisplayName) {
+    account.displayName = nextDisplayName;
+    mutated = true;
+  }
+  if (account.role !== nextRole) {
+    account.role = nextRole;
+    mutated = true;
+  }
+  if ((account.scope || '') !== (nextScope || '')) {
+    account.scope = nextScope;
+    mutated = true;
+  }
+  if ((account.avatar || '') !== (nextAvatar || '')) {
+    account.avatar = nextAvatar;
+    mutated = true;
+  }
+  if (Boolean(account.isExecutor) !== nextIsExecutor) {
+    account.isExecutor = nextIsExecutor;
+    mutated = true;
+  }
+
+  // Shallow compare permissions
+  const currentPermissions = account.permissions || {};
+  const incomingPermissions = nextPermissions || {};
+  const keys = new Set([...Object.keys(currentPermissions), ...Object.keys(incomingPermissions)]);
+  for (const key of keys) {
+    if (Boolean(currentPermissions[key]) !== Boolean(incomingPermissions[key])) {
+      account.permissions = incomingPermissions;
+      mutated = true;
+      break;
+    }
+  }
+
+  if (mutated) {
+    await account.save();
+  }
+  return account;
+};
 
 const COOKIE_NAME = 'pf_token';
 const COOKIE_MAX_AGE = 1000 * 60 * 60 * 12; // 12 hours
@@ -78,12 +204,22 @@ exports.signup = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Username is required.' });
   }
 
+  // Legacy executor usernames (admin3-*) are no longer accepted.
+  if (isLegacyExecutorUsername(username)) {
+    return res.status(400).json({ error: 'This username format is no longer allowed. Use your assigned name instead.' });
+  }
+
+  const groups = await loadGroups();
+  if (!isAllowedUsername(username, groups)) {
+    return res.status(400).json({ error: 'Username is not allowed. Ask an admin to add your name.' });
+  }
+
   let account = await Account.findOne({ username });
 
   if (!account) {
-    const roleProfile = getRoleProfile(username);
+    const roleProfile = resolveProfileFromGroups(username, groups);
     if (!roleProfile) {
-      return res.status(400).json({ error: 'Only admin1, admin2, admin4, or provisioned admin3-* accounts can sign up.' });
+      return res.status(400).json({ error: 'Username is not allowed. Ask an admin to add your name.' });
     }
     account = new Account({
       username,
@@ -92,8 +228,14 @@ exports.signup = asyncHandler(async (req, res) => {
       scope: roleProfile.scope,
       avatar: roleProfile.avatar,
       permissions: roleProfile.permissions,
-      isExecutor: false,
+      isExecutor: Boolean(roleProfile.isExecutor),
     });
+  } else {
+    // If the account already exists, keep it but ensure the role matches the current group assignment.
+    const roleProfile = resolveProfileFromGroups(username, groups);
+    if (roleProfile) {
+      account = await syncAccountFromProfile(account, roleProfile);
+    }
   }
 
   if (account.passwordHash) {
@@ -116,9 +258,24 @@ exports.login = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Username and password are required.' });
   }
 
-  const account = await Account.findOne({ username });
+  let account = await Account.findOne({ username });
   if (!account || !account.passwordHash) {
     return res.status(400).json({ error: 'Invalid username or password.' });
+  }
+
+  // Enforce allowlist-only logins.
+  if (isLegacyExecutorUsername(username)) {
+    return res.status(400).json({ error: 'Invalid username or password.' });
+  }
+  const groups = await loadGroups();
+  if (!isAllowedUsername(username, groups)) {
+    return res.status(403).json({ error: 'This username is no longer allowed.' });
+  }
+
+  // Sync permissions/role with current group settings.
+  const roleProfile = resolveProfileFromGroups(username, groups);
+  if (roleProfile) {
+    account = await syncAccountFromProfile(account, roleProfile);
   }
 
   if (account.status !== 'active') {
@@ -136,7 +293,19 @@ exports.login = asyncHandler(async (req, res) => {
 });
 
 exports.getProfile = asyncHandler(async (req, res) => {
-  const account = await Account.findById(req.user._id);
+  let account = await Account.findById(req.user._id);
+
+  // Keep the session consistent with current group membership.
+  // If removed from allowlist, deny profile.
+  const groups = await loadGroups();
+  if (!isAllowedUsername(account?.username, groups)) {
+    clearAuthCookie(res);
+    return res.status(403).json({ error: 'This username is no longer allowed.' });
+  }
+  const roleProfile = resolveProfileFromGroups(account?.username, groups);
+  if (roleProfile && account) {
+    account = await syncAccountFromProfile(account, roleProfile);
+  }
   return res.json({ user: serializeAccount(account) });
 });
 
@@ -151,9 +320,14 @@ exports.resetAccount = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Username is required.' });
   }
 
-  const baseRole = ROLE_DEFINITIONS[username];
-  if (!baseRole) {
-    return res.status(400).json({ error: 'Only admin1, admin2, or admin4 accounts can be reset here.' });
+  if (isLegacyExecutorUsername(username)) {
+    return res.status(400).json({ error: 'Only admin accounts can be reset here.' });
+  }
+
+  const groups = await loadGroups();
+  const resolved = resolveProfileFromGroups(username, groups);
+  if (!resolved || resolved.isExecutor) {
+    return res.status(400).json({ error: 'Only admin accounts can be reset here.' });
   }
 
   const account = await Account.findOne({ username });

@@ -16,5 +16,6 @@ router.delete('/:id/team/:userId', requireAnyPermission('manageProjects', 'manag
 router.get('/:id/quotations', requirePermission('viewProjects'), projectController.getProjectQuotations);
 router.put('/:id/quotations', requireAdmin1, projectController.saveProjectQuotations);
 router.get('/:id/quotations/pdf', requirePermission('viewProjects'), projectController.streamProjectQuotationsPdf);
+router.get('/:id/quotations/versions/:versionId/pdf', requirePermission('viewProjects'), projectController.streamProjectQuotationVersionPdf);
 
 module.exports = router;

@@ -29,13 +29,13 @@ const Summary = () => {
     getQuotationsForProject,
     loadQuotationsForProject,
     fetchQuotationsPdf,
+    fetchQuotationVersionPdf,
   } = useData();
   const {
     hasPermission,
     user: authUser,
-    registerExecutorAccount,
   } = useAuth();
-  const isAdminOne = authUser?.username === 'admin1';
+  const isAdminOne = authUser?.role === 'FULL_ACCESS';
   
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -60,6 +60,18 @@ const Summary = () => {
   const quotations = getQuotationsForProject(id);
   const quotationEntries = quotations?.entries || [];
   const hasQuotations = quotationEntries.length > 0;
+
+  const quotationVersions = Array.isArray(project?.quotationVersions) ? project.quotationVersions : [];
+  const sortedQuotationVersions = quotationVersions
+    .slice()
+    .sort((a, b) => {
+      const aTime = a?.generatedAt ? new Date(a.generatedAt).getTime() : 0;
+      const bTime = b?.generatedAt ? new Date(b.generatedAt).getTime() : 0;
+      return bTime - aTime;
+    });
+  const olderQuotationVersions = sortedQuotationVersions.length > 1
+    ? sortedQuotationVersions.slice(1)
+    : [];
   useEffect(() => {
     if (!projectId || !isAdminOne) return;
     loadQuotationsForProject(projectId).catch(() => {});
@@ -101,6 +113,37 @@ const Summary = () => {
     setTimeout(() => URL.revokeObjectURL(url), 1000 * 60);
   };
 
+  const openBlobInNewTab = (blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(url), 1000 * 60);
+  };
+
+  const downloadBlob = (blob, filename) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'Quotations.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000 * 60);
+  };
+
+  const handleViewOldVersion = async (version) => {
+    if (!projectId || !version?.id) return;
+    const blob = await fetchQuotationVersionPdf(projectId, version.id);
+    openBlobInNewTab(blob);
+  };
+
+  const handleDownloadOldVersion = async (version) => {
+    if (!projectId || !version?.id) return;
+    const blob = await fetchQuotationVersionPdf(projectId, version.id);
+    downloadBlob(blob, version?.pdfName || 'Quotations.pdf');
+  };
+
   const normalizeIdentifier = (value) => String(value ?? '').trim().toLowerCase();
   const doesTaskBelongToMember = (task, member) => {
     if (!task || !member || !task.assignee) return false;
@@ -127,20 +170,7 @@ const Summary = () => {
     if (!projectId || !canManageTeam) return;
     setUserModalError('');
     try {
-      const { executorUsername, ...memberData } = userData;
-      const trimmedExecutor = executorUsername?.trim();
-      if (authUser?.username === 'admin1' && !trimmedExecutor) {
-        throw new Error('Executor username is required.');
-      }
-      const memberPayload = { ...memberData };
-      if (trimmedExecutor) {
-        await registerExecutorAccount({
-          name: memberData.name,
-          username: trimmedExecutor,
-        });
-        memberPayload.executorUsername = trimmedExecutor;
-      }
-      await addProjectMember(projectId, memberPayload);
+      await addProjectMember(projectId, { name: userData.name });
       setShowUserModal(false);
     } catch (err) {
       setUserModalError(err.message || 'Unable to add member.');
@@ -301,6 +331,53 @@ const Summary = () => {
               <p className="text-sm text-gray-400 mt-2">Edit the project to add context for your admins.</p>
             </div>
           )}
+
+          {isAdminOne && olderQuotationVersions.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-jira-gray">Older Quotation Versions</h3>
+                  <p className="text-sm text-gray-500">Previous PDFs and snapshots (latest stays above).</p>
+                </div>
+                <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                  {olderQuotationVersions.length} version{olderQuotationVersions.length === 1 ? '' : 's'}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {olderQuotationVersions.map((version) => (
+                  <div key={version.id} className="border border-gray-100 rounded-2xl p-4 bg-gray-50/60">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-jira-gray truncate">{version.pdfName || 'Quotations.pdf'}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {version.generatedAt ? new Date(version.generatedAt).toLocaleString() : 'Unknown date'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 text-jira-blue font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => handleViewOldVersion(version)}
+                          className="hover:underline"
+                          disabled={!version.pdfAvailable}
+                        >
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadOldVersion(version)}
+                          className="hover:underline"
+                          disabled={!version.pdfAvailable}
+                        >
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -399,7 +476,6 @@ const Summary = () => {
         }}
         onSubmit={handleAddUser}
         error={userModalError}
-        canProvisionExecutors={authUser?.username === 'admin1'}
       />
     )}
 

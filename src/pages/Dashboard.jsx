@@ -13,7 +13,7 @@ import { useSidebar } from '../context/SidebarContext';
 const Dashboard = () => {
   const { collapsed } = useSidebar();
   const { user } = useAuth();
-  const isAdminOne = user?.username === 'admin1';
+  const isAdminOne = user?.role === 'FULL_ACCESS';
   
   return (
     <div className="flex min-h-screen bg-jira-bg dark:bg-[var(--bg-body)]">
@@ -37,6 +37,7 @@ const Dashboard = () => {
                   <Route path="quotations" element={<Quotations />} />
                 )}
                 <Route path="tasks/:taskId" element={<TaskDetails />} />
+                <Route path="*" element={<Navigate to="summary" replace />} />
               </Routes>
             </>
           } />

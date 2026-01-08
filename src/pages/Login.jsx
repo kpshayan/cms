@@ -83,12 +83,12 @@ const Login = () => {
                   onChange={(e) => setUsername(e.target.value)}
                   disabled={loading}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-jira-blue focus:border-transparent transition-all disabled:opacity-50 bg-white dark:bg-[#10182c] dark:border-white/10 dark:text-gray-100"
-                  placeholder="admin1 or admin3-1"
+                  placeholder="your username"
                   autoComplete="one-time-code"
                 />
               </div>
               <p className="text-xs text-gray-500 mt-2 dark:text-gray-400">
-                Use admin1, admin2, admin4, or the admin3-* username that admin1 provisioned for you. First-time users should visit Sign Up to store a password (hashes are generated automatically).
+                Only usernames added to the access list can sign in. If you cannot sign in, ask an admin to add your name.
               </p>
             </div>
 

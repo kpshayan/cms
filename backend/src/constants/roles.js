@@ -57,11 +57,8 @@ const ROLE_DEFINITIONS = {
   },
 };
 
-const getRoleProfile = (username) => ROLE_DEFINITIONS[String(username || '').toLowerCase()] || null;
-
 module.exports = {
   EXECUTOR_ROLE_BLUEPRINT,
   ROLE_DEFINITIONS,
   EXECUTOR_USERNAME_PREFIX,
-  getRoleProfile,
 };

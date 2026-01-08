@@ -69,9 +69,9 @@ export const ROLE_SUMMARY = [
     summary: details.summary,
   })),
   {
-    username: 'admin3-*',
+    username: 'admin3',
     role: EXECUTOR_ROLE_BLUEPRINT.role,
     scope: EXECUTOR_ROLE_BLUEPRINT.scope,
-    summary: EXECUTOR_ROLE_BLUEPRINT.summary,
+    summary: 'Can work only on issues assigned to their username.',
   },
 ];

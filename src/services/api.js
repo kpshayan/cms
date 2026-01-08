@@ -99,6 +99,28 @@ export const projectAPI = {
 
     return response.blob();
   },
+
+  downloadQuotationVersionPdf: async (projectId, versionId) => {
+    const response = await fetch(`${API_BASE}/projects/${projectId}/quotations/versions/${versionId}/pdf`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to fetch quotations PDF.';
+      try {
+        const errorData = await response.json();
+        if (errorData?.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (err) {
+        // ignore body parse errors
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response.blob();
+  },
 };
 
 // Tasks API
