@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, Tag, User, Paperclip, Inbox, Edit2, Upload, Search, X } from 'lucide-react';
+import { ArrowLeft, Calendar, Tag, User, Paperclip, Inbox, Edit2, Upload, Search, X, Trash2 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -21,7 +21,7 @@ const chipClass = {
 const TaskDetails = () => {
   const navigate = useNavigate();
   const { id: projectId, taskId } = useParams();
-    const { getProjectById, getTaskById, updateTask } = useData();
+    const { getProjectById, getTaskById, updateTask, addTaskComment, deleteTaskComment } = useData();
     const { hasPermission, user, executors } = useAuth();
 
   const project = getProjectById(projectId);
@@ -47,6 +47,66 @@ const TaskDetails = () => {
 
   const canEditTask = canManageTasks || (canManageOwnTasks && isTaskOwnedByCurrentUser);
   const canViewDetails = canManageTasks || canManageOwnTasks || canViewTasks;
+
+  const attachments = task?.attachments || [];
+  const comments = Array.isArray(task?.comments) ? task.comments : [];
+  const assignee = task?.assignee;
+  const assigneeAvatar = assignee?.avatar || assignee?.name?.charAt(0) || '?';
+  const assigneeDisplayName = assignee?.name || assignee?.username || 'Unassigned';
+  const assigneeEmail = assignee?.email || (assignee?.username ? `${assignee.username}@projectflow.io` : '—');
+
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [descriptionValue, setDescriptionValue] = useState(task?.description || '');
+  const [savingDescription, setSavingDescription] = useState(false);
+
+  const [newAttachments, setNewAttachments] = useState([]);
+  const [attachmentsDirty, setAttachmentsDirty] = useState(false);
+  const [savingAttachments, setSavingAttachments] = useState(false);
+  const [hiddenAttachmentIds, setHiddenAttachmentIds] = useState([]);
+
+  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
+  const [assigneeSearch, setAssigneeSearch] = useState('');
+  const dropdownRef = useRef(null);
+
+  const [commentText, setCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState(null);
+  const canAddComment = ['FULL_ACCESS', 'TASK_EDITOR', 'EXECUTOR', 'PROJECT_READ_ONLY'].includes(user?.role);
+
+  useEffect(() => {
+    setDescriptionValue(task?.description || '');
+  }, [task?.description]);
+
+  useEffect(() => {
+    setNewAttachments([]);
+    setAttachmentsDirty(false);
+  }, [task?.attachments?.length]);
+
+  useEffect(() => {
+    setHiddenAttachmentIds([]);
+  }, [task?._id]);
+
+  useEffect(() => {
+    if (!assigneeDropdownOpen) return;
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setAssigneeDropdownOpen(false);
+        setAssigneeSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [assigneeDropdownOpen]);
+
+  const hiddenAttachmentSet = useMemo(() => new Set(hiddenAttachmentIds), [hiddenAttachmentIds]);
+
+  const filteredUsers = useMemo(() => {
+    const list = Array.isArray(executors) ? executors : [];
+    if (!assigneeSearch.trim()) return list;
+    return list.filter(candidate =>
+      `${candidate.name} ${candidate.email}`.toLowerCase().includes(assigneeSearch.trim().toLowerCase())
+    );
+  }, [executors, assigneeSearch]);
 
   if (!canViewDetails) {
     return (
@@ -81,50 +141,6 @@ const TaskDetails = () => {
       </div>
     );
   }
-
-  const attachments = task.attachments || [];
-  const assignee = task.assignee;
-  const assigneeAvatar = assignee?.avatar || assignee?.name?.charAt(0) || '?';
-  const assigneeDisplayName = assignee?.name || assignee?.username || 'Unassigned';
-  const assigneeEmail = assignee?.email || (assignee?.username ? `${assignee.username}@projectflow.io` : '—');
-
-  const [isEditingDescription, setIsEditingDescription] = useState(false);
-  const [descriptionValue, setDescriptionValue] = useState(task.description || '');
-  const [savingDescription, setSavingDescription] = useState(false);
-
-  const [newAttachments, setNewAttachments] = useState([]);
-  const [attachmentsDirty, setAttachmentsDirty] = useState(false);
-  const [savingAttachments, setSavingAttachments] = useState(false);
-  const [hiddenAttachmentIds, setHiddenAttachmentIds] = useState([]);
-
-  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
-  const [assigneeSearch, setAssigneeSearch] = useState('');
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    setDescriptionValue(task.description || '');
-  }, [task.description]);
-
-  useEffect(() => {
-    setNewAttachments([]);
-    setAttachmentsDirty(false);
-  }, [task.attachments?.length]);
-
-  useEffect(() => {
-    setHiddenAttachmentIds([]);
-  }, [task._id]);
-
-  useEffect(() => {
-    if (!assigneeDropdownOpen) return;
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setAssigneeDropdownOpen(false);
-        setAssigneeSearch('');
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [assigneeDropdownOpen]);
 
   const buildTaskPayload = (overrides = {}) => ({
     title: task.title,
@@ -233,7 +249,43 @@ const TaskDetails = () => {
     return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`;
   };
 
-  const hiddenAttachmentSet = useMemo(() => new Set(hiddenAttachmentIds), [hiddenAttachmentIds]);
+  const formatDateTime = (value) => {
+    if (!value) return '';
+    try {
+      return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    } catch {
+      return String(value);
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    if (!canAddComment) return;
+    const text = commentText.trim();
+    if (!text) return;
+
+    try {
+      setSubmittingComment(true);
+      await addTaskComment(task._id || task.id, text);
+      setCommentText('');
+    } catch (err) {
+      console.error('Failed to add comment', err);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!commentId) return;
+    try {
+      setDeletingCommentId(commentId);
+      await deleteTaskComment(task._id || task.id, commentId);
+    } catch (err) {
+      console.error('Failed to delete comment', err);
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
   const visibleExistingAttachments = attachments.filter(file => {
     const fileKey = file._id || file.id || file.name;
     return !hiddenAttachmentSet.has(fileKey);
@@ -243,13 +295,6 @@ const TaskDetails = () => {
     ...newAttachments.map(file => ({ file, isNew: true })),
   ];
   const hiddenCount = attachments.length - visibleExistingAttachments.length;
-
-  const filteredUsers = useMemo(() => {
-    if (!assigneeSearch.trim()) return executors;
-    return executors.filter(candidate =>
-      `${candidate.name} ${candidate.email}`.toLowerCase().includes(assigneeSearch.trim().toLowerCase())
-    );
-  }, [executors, assigneeSearch]);
 
   const handleAssigneeSelect = async (executorAccount) => {
     if (!canManageTasks) return;
@@ -467,122 +512,195 @@ const TaskDetails = () => {
           </div>
 
           <div className="px-8 py-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <Paperclip className="w-5 h-5 text-jira-blue" />
-                <h2 className="text-lg font-semibold text-jira-gray dark:text-[var(--text-primary)]">Attachments</h2>
-                <span className="text-sm text-gray-500 dark:text-[var(--text-secondary)]">{attachmentDisplayList.length} files</span>
-              </div>
-            </div>
+            <div className="grid gap-6 lg:grid-cols-5">
+              <div className="lg:col-span-2">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <Paperclip className="w-5 h-5 text-jira-blue" />
+                    <h2 className="text-lg font-semibold text-jira-gray dark:text-[var(--text-primary)]">Attachments</h2>
+                    <span className="text-sm text-gray-500 dark:text-[var(--text-secondary)]">{attachmentDisplayList.length} files</span>
+                  </div>
+                </div>
 
-            {attachmentDisplayList.length === 0 ? (
-              <div className="p-8 text-center text-gray-400 dark:text-[var(--text-secondary)] bg-gray-50 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
-                <Inbox className="w-12 h-12 mx-auto mb-4 text-gray-400 dark:text-white/20" />
-                <p>No attachments for this task yet.</p>
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {attachmentDisplayList.map(({ file, isNew }) => {
-                  const fileId = file._id || file.id || `${file.name}-${file.size}`;
-                  const dataUrl = `data:${file.type || 'application/octet-stream'};base64,${file.data}`;
-                  return (
-                    <div key={fileId} className="flex items-center justify-between bg-blue-50 dark:bg-white/5 border border-blue-100 dark:border-white/10 rounded-2xl p-4">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <p className="font-semibold text-jira-gray dark:text-[var(--text-primary)]">{file.name}</p>
-                          {isNew && (
-                            <span className="text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:border-amber-400/40">
-                              Pending
-                            </span>
-                          )}
+                {attachmentDisplayList.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 dark:text-[var(--text-secondary)] bg-gray-50 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
+                    <Inbox className="w-12 h-12 mx-auto mb-4 text-gray-400 dark:text-white/20" />
+                    <p>No attachments for this task yet.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {attachmentDisplayList.map(({ file, isNew }) => {
+                      const fileId = file._id || file.id || `${file.name}-${file.size}`;
+                      const dataUrl = `data:${file.type || 'application/octet-stream'};base64,${file.data}`;
+                      return (
+                        <div key={fileId} className="flex items-center justify-between bg-blue-50 dark:bg-white/5 border border-blue-100 dark:border-white/10 rounded-2xl p-4">
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <p className="font-semibold text-jira-gray dark:text-[var(--text-primary)]">{file.name}</p>
+                              {isNew && (
+                                <span className="text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:border-amber-400/40">
+                                  Pending
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-[var(--text-secondary)]">{formatFileSize(file.size)}</p>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <a
+                              href={dataUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-semibold text-jira-blue hover:underline"
+                            >
+                              View
+                            </a>
+                            <a
+                              href={dataUrl}
+                              download={file.name}
+                              className="text-sm font-semibold text-jira-blue hover:underline"
+                            >
+                              Download
+                            </a>
+                            {canEditTask && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAttachment(fileId, isNew)}
+                                className="p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-500/20"
+                                title={isNew ? 'Remove pending upload' : 'Hide locally (soft delete)'}
+                              >
+                                <X className="w-4 h-4 text-red-500" />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-[var(--text-secondary)]">{formatFileSize(file.size)}</p>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <a
-                          href={dataUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-semibold text-jira-blue hover:underline"
-                        >
-                          View
-                        </a>
-                        <a
-                          href={dataUrl}
-                          download={file.name}
-                          className="text-sm font-semibold text-jira-blue hover:underline"
-                        >
-                          Download
-                        </a>
-                        {canEditTask && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveAttachment(fileId, isNew)}
-                            className="p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-500/20"
-                            title={isNew ? 'Remove pending upload' : 'Hide locally (soft delete)'}
-                          >
-                            <X className="w-4 h-4 text-red-500" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                      );
+                    })}
+                  </div>
+                )}
 
-            {hiddenCount > 0 && (
-              <div className="mt-4 flex items-center justify-between px-4 py-3 rounded-2xl border border-dashed border-amber-200 bg-amber-50/80 dark:bg-amber-500/10 dark:border-amber-400/40 text-xs text-amber-700 dark:text-amber-200">
-                <span>{hiddenCount} attachment{hiddenCount > 1 ? 's are' : ' is'} hidden locally. Refresh or show them again.</span>
+                {hiddenCount > 0 && (
+                  <div className="mt-4 flex items-center justify-between px-4 py-3 rounded-2xl border border-dashed border-amber-200 bg-amber-50/80 dark:bg-amber-500/10 dark:border-amber-400/40 text-xs text-amber-700 dark:text-amber-200">
+                    <span>{hiddenCount} attachment{hiddenCount > 1 ? 's are' : ' is'} hidden locally. Refresh or show them again.</span>
+                    {canEditTask && (
+                      <button
+                        type="button"
+                        onClick={() => setHiddenAttachmentIds([])}
+                        className="font-semibold text-amber-800 dark:text-amber-100 underline-offset-2 hover:underline"
+                      >
+                        Show hidden
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {canEditTask && (
-                  <button
-                    type="button"
-                    onClick={() => setHiddenAttachmentIds([])}
-                    className="font-semibold text-amber-800 dark:text-amber-100 underline-offset-2 hover:underline"
-                  >
-                    Show hidden
-                  </button>
+                  <div className="mt-6">
+                    <input
+                      id="task-attachment-upload"
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={handleAttachmentUpload}
+                    />
+                    <label
+                      htmlFor="task-attachment-upload"
+                      className="flex flex-col items-center justify-center px-6 py-10 border-2 border-dashed border-gray-300 dark:border-white/15 rounded-2xl bg-gray-50 dark:bg-white/5 hover:border-jira-blue dark:hover:border-sky-400 transition-all cursor-pointer"
+                    >
+                      <Upload className="w-8 h-8 text-gray-400 mb-3" />
+                      <p className="text-sm font-semibold text-gray-600 dark:text-[var(--text-secondary)]">Drop files here or click to upload</p>
+                      <p className="text-xs text-gray-400">PDF, images, docs — up to 10MB each</p>
+                    </label>
+                    <div className="flex items-center justify-between mt-4 text-xs text-gray-500 dark:text-[var(--text-secondary)]">
+                      <p>
+                        {attachmentsDirty
+                          ? 'You have new attachments pending save.'
+                          : hiddenCount > 0
+                            ? 'Some attachments are hidden only in this view.'
+                            : 'Attachments are synced to this task.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleAttachmentSave}
+                        disabled={!attachmentsDirty || savingAttachments}
+                        className="px-4 py-2 text-sm font-semibold rounded-full bg-gradient-to-r from-jira-blue to-jira-blue-light text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {savingAttachments ? 'Saving...' : 'Save Attachments'}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
-            )}
 
-            {canEditTask && (
-              <div className="mt-6">
-                <input
-                  id="task-attachment-upload"
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={handleAttachmentUpload}
-                />
-                <label
-                  htmlFor="task-attachment-upload"
-                  className="flex flex-col items-center justify-center px-6 py-10 border-2 border-dashed border-gray-300 dark:border-white/15 rounded-2xl bg-gray-50 dark:bg-white/5 hover:border-jira-blue dark:hover:border-sky-400 transition-all cursor-pointer"
-                >
-                  <Upload className="w-8 h-8 text-gray-400 mb-3" />
-                  <p className="text-sm font-semibold text-gray-600 dark:text-[var(--text-secondary)]">Drop files here or click to upload</p>
-                  <p className="text-xs text-gray-400">PDF, images, docs — up to 10MB each</p>
-                </label>
-                <div className="flex items-center justify-between mt-4 text-xs text-gray-500 dark:text-[var(--text-secondary)]">
-                  <p>
-                    {attachmentsDirty
-                      ? 'You have new attachments pending save.'
-                      : hiddenCount > 0
-                        ? 'Some attachments are hidden only in this view.'
-                        : 'Attachments are synced to this task.'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleAttachmentSave}
-                    disabled={!attachmentsDirty || savingAttachments}
-                    className="px-4 py-2 text-sm font-semibold rounded-full bg-gradient-to-r from-jira-blue to-jira-blue-light text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {savingAttachments ? 'Saving...' : 'Save Attachments'}
-                  </button>
+              <div className="lg:col-span-3">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-jira-gray dark:text-[var(--text-primary)]">Comments</h2>
+                  <span className="text-sm text-gray-500 dark:text-[var(--text-secondary)]">{comments.length}</span>
+                </div>
+
+                <div className="rounded-2xl border border-gray-100 dark:border-white/10 bg-white dark:bg-[var(--bg-surface)] p-4">
+                  {canAddComment && (
+                    <div className="mb-4">
+                      <textarea
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        rows={3}
+                        placeholder="Write a comment..."
+                        className="w-full resize-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-jira-gray dark:text-[var(--text-primary)] placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
+                      />
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleSubmitComment}
+                          disabled={submittingComment || !commentText.trim()}
+                          className="px-4 py-2 text-sm font-semibold rounded-full bg-gradient-to-r from-jira-blue to-jira-blue-light text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {submittingComment ? 'Posting...' : 'Post'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {comments.length === 0 ? (
+                    <div className="text-sm text-gray-400 dark:text-[var(--text-secondary)]">No comments yet.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {comments
+                        .slice()
+                        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                        .map((comment) => {
+                          const authorName = comment?.author?.name || comment?.author?.username || 'Unknown';
+                          const authorUsername = normalizeIdentifier(comment?.author?.username);
+                          const viewerUsername = normalizeIdentifier(user?.username);
+                          const canDeleteComment = user?.role === 'FULL_ACCESS' || (authorUsername && viewerUsername && authorUsername === viewerUsername);
+                          const when = formatDateTime(comment?.createdAt);
+                          return (
+                            <div key={comment._id || `${authorName}-${comment.createdAt}-${comment.text?.slice(0, 12)}`} className="rounded-xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3">
+                              <div className="flex items-baseline justify-between gap-3">
+                                <div className="text-sm font-semibold text-jira-gray dark:text-[var(--text-primary)] truncate">{authorName}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="text-xs text-gray-500 dark:text-[var(--text-secondary)] whitespace-nowrap">{when}</div>
+                                  {canDeleteComment && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteComment(comment._id)}
+                                      disabled={deletingCommentId === String(comment._id)}
+                                      className="p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-500/20 disabled:opacity-40"
+                                      title="Delete comment"
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-500" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="mt-1 text-sm text-gray-700 dark:text-[var(--text-secondary)] whitespace-pre-wrap break-words">{comment.text}</div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-
+            </div>
           </div>
         </div>
       </div>

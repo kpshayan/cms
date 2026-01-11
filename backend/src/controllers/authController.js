@@ -22,6 +22,44 @@ const loadGroups = async () => {
   return map;
 };
 
+const ROLE_KEY_BY_LABEL = {
+  owner: 'admin1',
+  admin: 'admin2',
+  administrator: 'admin2',
+  write: 'admin3',
+  read: 'admin4',
+  none: null,
+  admin1: 'admin1',
+  admin2: 'admin2',
+  admin3: 'admin3',
+  admin4: 'admin4',
+};
+
+const serializeRoleAssignments = (groups) => ({
+  owner: Array.isArray(groups?.admin1) ? groups.admin1 : [],
+  administrator: Array.isArray(groups?.admin2) ? groups.admin2 : [],
+  write: Array.isArray(groups?.admin3) ? groups.admin3 : [],
+  read: Array.isArray(groups?.admin4) ? groups.admin4 : [],
+});
+
+const getOrCreateGroupDoc = async (key) => {
+  const normalizedKey = String(key || '').trim().toLowerCase();
+  if (!['admin1', 'admin2', 'admin3', 'admin4'].includes(normalizedKey)) {
+    const err = new Error('Invalid role key.');
+    err.status = 400;
+    throw err;
+  }
+
+  let doc = await AccessGroup.findOne({ key: normalizedKey });
+  if (!doc) {
+    doc = await AccessGroup.create({ key: normalizedKey, usernames: [] });
+  }
+  if (!Array.isArray(doc.usernames)) {
+    doc.usernames = [];
+  }
+  return doc;
+};
+
 const isAllowedUsername = (username, groups) => {
   const normalized = normalizeUsername(username);
   if (!normalized) return false;
@@ -290,6 +328,62 @@ exports.login = asyncHandler(async (req, res) => {
   const token = buildToken(account);
   attachAuthCookie(res, token);
   return res.json({ token, user: serializeAccount(account) });
+});
+
+// Owner/admin1-only role management
+exports.getRoleAssignments = asyncHandler(async (req, res) => {
+  const groups = await loadGroups();
+  return res.json({ roles: serializeRoleAssignments(groups) });
+});
+
+exports.assignRole = asyncHandler(async (req, res) => {
+  const username = normalizeUsername(req.body.username);
+  const incomingRole = String(req.body.role || '').trim().toLowerCase();
+  const roleKey = ROLE_KEY_BY_LABEL[incomingRole];
+
+  if (!username) {
+    return res.status(400).json({ error: 'Username is required.' });
+  }
+  if (isLegacyExecutorUsername(username)) {
+    return res.status(400).json({ error: 'This username format is no longer allowed. Use your assigned name instead.' });
+  }
+  if (roleKey === undefined) {
+    return res.status(400).json({ error: 'Role is required (owner/administrator/write/read) or "none" to remove.' });
+  }
+
+  const groupDocs = await Promise.all([
+    getOrCreateGroupDoc('admin1'),
+    getOrCreateGroupDoc('admin2'),
+    getOrCreateGroupDoc('admin3'),
+    getOrCreateGroupDoc('admin4'),
+  ]);
+
+  // Remove username from all groups (one-role-only), then add to target.
+  for (const group of groupDocs) {
+    group.usernames = (group.usernames || []).filter((u) => normalizeUsername(u) !== username);
+  }
+
+  if (roleKey) {
+    const target = groupDocs.find((g) => g.key === roleKey);
+    if (target && !target.usernames.some((u) => normalizeUsername(u) === username)) {
+      target.usernames.push(username);
+    }
+  }
+
+  await Promise.all(groupDocs.map((g) => g.save()));
+
+  const groups = await loadGroups();
+
+  // If the account already exists, immediately sync its permissions/role to match the assignment.
+  const existing = await Account.findOne({ username });
+  if (existing) {
+    const roleProfile = resolveProfileFromGroups(username, groups);
+    if (roleProfile) {
+      await syncAccountFromProfile(existing, roleProfile);
+    }
+  }
+
+  return res.json({ roles: serializeRoleAssignments(groups) });
 });
 
 exports.getProfile = asyncHandler(async (req, res) => {

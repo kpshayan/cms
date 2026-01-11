@@ -41,14 +41,11 @@ const Navbar = () => {
             <Link to="/pricing" className="text-gray-700 hover:text-jira-blue transition-colors dark:text-gray-300">
               Pricing
             </Link>
-            <Link to="/login" className="text-gray-700 hover:text-jira-blue transition-colors dark:text-gray-300">
-              Login
-            </Link>
             <Link 
-              to="/signup" 
+              to="/auth?mode=signup" 
               className="bg-jira-blue text-white px-6 py-2 rounded-lg hover:bg-jira-blue-light transition-all duration-200 shadow-lg shadow-jira-blue/30 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
             >
-              Sign Up
+              Get Started
             </Link>
           </div>
 
@@ -92,18 +89,11 @@ const Navbar = () => {
               Pricing
             </Link>
             <Link 
-              to="/login" 
-              className="block py-2 text-gray-700 hover:text-jira-blue transition-colors dark:text-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Login
-            </Link>
-            <Link 
-              to="/signup" 
+              to="/auth?mode=signup" 
               className="block bg-jira-blue text-white px-6 py-2 rounded-lg hover:bg-jira-blue-light transition-colors text-center shadow-lg shadow-jira-blue/30"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Sign Up
+              Get Started
             </Link>
           </div>
         </div>

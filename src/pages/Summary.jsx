@@ -10,7 +10,8 @@ import {
   Plus,
   UserPlus,
   Trash2,
-  FileText
+  FileText,
+  Send
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +24,9 @@ const Summary = () => {
   const { 
     getProjectById, 
     getTasksByProject,
+    updateProject,
+    addProjectComment,
+    deleteProjectComment,
     addProjectMember,
     removeProjectMember,
     updateTask,
@@ -49,6 +53,15 @@ const Summary = () => {
   const canAddTasks = hasPermission('manageTasks');
   const canManageTasks = hasPermission('manageTasks');
   const canManageTeam = (hasPermission('manageProjects') || hasPermission('manageTeamMembers')) && !authUser?.isExecutor;
+  const canEditProjectDescription = hasPermission('manageProjects') && !authUser?.isExecutor;
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [descriptionError, setDescriptionError] = useState('');
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
+  const [showAllQuotationVersions, setShowAllQuotationVersions] = useState(false);
+  const [summaryCommentText, setSummaryCommentText] = useState('');
+  const [submittingSummaryComment, setSubmittingSummaryComment] = useState(false);
+  const [deletingSummaryCommentId, setDeletingSummaryCommentId] = useState(null);
 
   const completedTasks = tasks.filter(t => t.status === 'done').length;
   const inProgressTasks = tasks.filter(t => t.status === 'in-progress').length;
@@ -57,9 +70,21 @@ const Summary = () => {
 
   const projectId = project?._id || project?.id;
   const teamMembers = project?.team || [];
+  const summaryComments = Array.isArray(project?.summaryComments) ? project.summaryComments : [];
   const quotations = getQuotationsForProject(id);
   const quotationEntries = quotations?.entries || [];
   const hasQuotations = quotationEntries.length > 0;
+
+  const quotationDetails = project?.quotationDetails || {};
+  const quotationDetailsFinalized = Boolean(project?.quotationDetailsFinalized);
+  const hasQuotationDetails = quotationDetailsFinalized && [
+    quotationDetails.name,
+    quotationDetails.production,
+    quotationDetails.project,
+    quotationDetails.type,
+    quotationDetails.producer,
+    quotationDetails.contact,
+  ].some((value) => String(value || '').trim());
 
   const quotationVersions = Array.isArray(project?.quotationVersions) ? project.quotationVersions : [];
   const sortedQuotationVersions = quotationVersions
@@ -72,6 +97,17 @@ const Summary = () => {
   const olderQuotationVersions = sortedQuotationVersions.length > 1
     ? sortedQuotationVersions.slice(1)
     : [];
+
+  const visibleOlderQuotationVersions = showAllQuotationVersions
+    ? olderQuotationVersions
+    : olderQuotationVersions.slice(0, 2);
+
+  useEffect(() => {
+    if (!project) return;
+    if (isEditingDescription) return;
+    setDescriptionDraft(project?.description || '');
+  }, [project, isEditingDescription]);
+
   useEffect(() => {
     if (!projectId || !isAdminOne) return;
     loadQuotationsForProject(projectId).catch(() => {});
@@ -144,7 +180,45 @@ const Summary = () => {
     downloadBlob(blob, version?.pdfName || 'Quotations.pdf');
   };
 
+  const startEditingDescription = () => {
+    if (!canEditProjectDescription) return;
+    setDescriptionError('');
+    setDescriptionDraft(project?.description || '');
+    setIsEditingDescription(true);
+  };
+
+  const cancelEditingDescription = () => {
+    setDescriptionError('');
+    setIsEditingDescription(false);
+    setDescriptionDraft(project?.description || '');
+  };
+
+  const saveDescription = async () => {
+    if (!projectId || !canEditProjectDescription) return;
+    setDescriptionError('');
+    setIsSavingDescription(true);
+    try {
+      await updateProject(projectId, { description: descriptionDraft });
+      setIsEditingDescription(false);
+    } catch (err) {
+      setDescriptionError(err?.message || 'Unable to update description.');
+    } finally {
+      setIsSavingDescription(false);
+    }
+  };
+
   const normalizeIdentifier = (value) => String(value ?? '').trim().toLowerCase();
+
+  const formatDateTime = (value) => {
+    if (!value) return '';
+    try {
+      return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    } catch {
+      return String(value);
+    }
+  };
+
+  const canPostSummaryComment = ['FULL_ACCESS', 'TASK_EDITOR', 'EXECUTOR', 'PROJECT_READ_ONLY'].includes(authUser?.role);
   const doesTaskBelongToMember = (task, member) => {
     if (!task || !member || !task.assignee) return false;
     const memberIdentifiers = [
@@ -164,6 +238,35 @@ const Summary = () => {
       task.assignee.name,
     ].map(normalizeIdentifier).filter(Boolean);
     return assigneeIdentifiers.some((identifier) => memberIdentifiers.includes(identifier));
+  };
+
+  const handleSubmitSummaryComment = async () => {
+    if (!projectId) return;
+    if (!canPostSummaryComment) return;
+    const text = String(summaryCommentText || '').trim();
+    if (!text) return;
+
+    try {
+      setSubmittingSummaryComment(true);
+      await addProjectComment(projectId, text);
+      setSummaryCommentText('');
+    } catch (err) {
+      console.error('Failed to add project comment', err);
+    } finally {
+      setSubmittingSummaryComment(false);
+    }
+  };
+
+  const handleDeleteSummaryComment = async (commentId) => {
+    if (!projectId || !commentId) return;
+    try {
+      setDeletingSummaryCommentId(String(commentId));
+      await deleteProjectComment(projectId, commentId);
+    } catch (err) {
+      console.error('Failed to delete project comment', err);
+    } finally {
+      setDeletingSummaryCommentId(null);
+    }
   };
 
   const handleAddUser = async (userData) => {
@@ -226,15 +329,31 @@ const Summary = () => {
           <h2 className="text-2xl font-bold text-jira-gray">Project Overview</h2>
           <p className="text-gray-600">Track your project progress and team activity</p>
         </div>
-        {canAddTasks && (
-          <button
-            onClick={() => setShowTaskModal(true)}
-            className="flex items-center space-x-2 bg-jira-blue text-white px-6 py-3 rounded-lg hover:bg-jira-blue-light transition-all duration-200 font-semibold shadow-lg hover:shadow-xl"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Add Task</span>
-          </button>
-        )}
+        <div className="flex items-center gap-4">
+          {hasQuotationDetails && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Details</p>
+              <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-xs text-gray-600">
+                <div className="truncate"><span className="font-semibold">Name:</span> {quotationDetails.name}</div>
+                <div className="truncate"><span className="font-semibold">Type:</span> {quotationDetails.type}</div>
+                <div className="truncate"><span className="font-semibold">Production:</span> {quotationDetails.production}</div>
+                <div className="truncate"><span className="font-semibold">Producer:</span> {quotationDetails.producer}</div>
+                <div className="truncate"><span className="font-semibold">Project:</span> {quotationDetails.project}</div>
+                <div className="truncate"><span className="font-semibold">Contact:</span> {quotationDetails.contact}</div>
+              </div>
+            </div>
+          )}
+
+          {canAddTasks && (
+            <button
+              onClick={() => setShowTaskModal(true)}
+              className="flex items-center space-x-2 bg-jira-blue text-white px-6 py-3 rounded-lg hover:bg-jira-blue-light transition-all duration-200 font-semibold shadow-lg hover:shadow-xl"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Add Task</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
@@ -275,28 +394,39 @@ const Summary = () => {
               <h3 className="text-xl font-bold text-jira-gray">Quotations Snapshot</h3>
               <p className="text-sm text-gray-500">Latest inputs from the Quotations flow.</p>
             </div>
-            <span className="text-xs font-semibold text-jira-blue bg-blue-50 px-3 py-1 rounded-full">
-              {quotationEntries.length} fields
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-jira-blue bg-blue-50 px-3 py-1 rounded-full">
+                {quotationEntries.length} fields
+              </span>
+              <button
+                type="button"
+                aria-label="Send quotations"
+                className="group inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-jira-blue border border-blue-100 hover:bg-blue-100 transition focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
+              >
+                <Send className="w-4 h-4 paper-plane-float group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:rotate-12 transition-transform duration-300" />
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto pr-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-3">
               {quotationEntries.map((entry) => (
-                <div key={entry.key} className="border border-gray-100 rounded-xl p-3 bg-gray-50/80">
+                <div
+                  key={entry.key}
+                  className="border border-gray-100 rounded-xl p-2 bg-gray-50/80 h-20 flex flex-col overflow-hidden"
+                >
                   <p className="text-xs uppercase tracking-wide text-gray-500">{entry.label}</p>
-                  <p className="mt-1 text-base font-semibold text-jira-gray break-words">{entry.value}</p>
+                  <p className="mt-1 text-sm font-semibold text-jira-gray break-words leading-snug line-clamp-2">
+                    {entry.value}
+                  </p>
                 </div>
               ))}
               {(quotations?.pdfAvailable || quotations?.pdfName) && (
-                <div className="border border-blue-100 rounded-2xl p-4 bg-blue-50/40 flex flex-col justify-between sm:col-span-2 lg:col-span-2 xl:col-span-2">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-500">Generated PDF</p>
-                    <p className="text-lg font-semibold text-jira-gray">{quotations?.pdfName || 'Quotations.pdf'}</p>
-                    {quotations?.generatedAt && (
-                      <p className="text-xs text-gray-500 mt-1">{new Date(quotations.generatedAt).toLocaleString()}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-jira-blue font-semibold mt-4">
+                <div className="border border-gray-100 rounded-xl p-2 bg-gray-50/80 h-20 flex flex-col overflow-hidden sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2">
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Generated PDF</p>
+                  <p className="mt-1 text-xs font-semibold text-jira-gray break-words leading-snug line-clamp-2">
+                    {quotations?.pdfName || 'Quotations.pdf'}
+                  </p>
+                  <div className="mt-auto flex items-center gap-3 text-jira-blue font-semibold text-xs">
                     <button onClick={handleViewPdf} className="hover:underline">
                       View
                     </button>
@@ -318,8 +448,49 @@ const Summary = () => {
               <FileText className="w-5 h-5 mr-2 text-jira-blue" />
               Project Description
             </h2>
+            {canEditProjectDescription && !isEditingDescription && (
+              <button
+                type="button"
+                onClick={startEditingDescription}
+                className="text-sm text-jira-blue hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors font-semibold"
+              >
+                Edit
+              </button>
+            )}
           </div>
-          {project?.description?.trim() ? (
+          {isEditingDescription ? (
+            <div className="space-y-3">
+              <textarea
+                value={descriptionDraft}
+                onChange={(e) => setDescriptionDraft(e.target.value)}
+                rows={6}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-jira-blue focus:border-transparent text-gray-700"
+                placeholder="Write a project description..."
+                disabled={isSavingDescription}
+              />
+              {descriptionError && (
+                <p className="text-sm text-red-500">{descriptionError}</p>
+              )}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={saveDescription}
+                  disabled={isSavingDescription}
+                  className="px-4 py-2 bg-jira-blue text-white rounded-lg hover:bg-jira-blue-light transition-colors font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSavingDescription ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEditingDescription}
+                  disabled={isSavingDescription}
+                  className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : project?.description?.trim() ? (
             <div className="space-y-4">
               <p className="text-base leading-relaxed text-gray-700 whitespace-pre-line">
                 {project.description}
@@ -328,7 +499,15 @@ const Summary = () => {
           ) : (
             <div className="text-center py-12">
               <p className="text-gray-500">No description provided for this project.</p>
-              <p className="text-sm text-gray-400 mt-2">Edit the project to add context for your admins.</p>
+              {canEditProjectDescription && (
+                <button
+                  type="button"
+                  onClick={startEditingDescription}
+                  className="text-sm text-jira-blue hover:underline mt-2 font-semibold"
+                >
+                  Add description
+                </button>
+              )}
             </div>
           )}
 
@@ -337,7 +516,7 @@ const Summary = () => {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-bold text-jira-gray">Older Quotation Versions</h3>
-                  <p className="text-sm text-gray-500">Previous PDFs and snapshots (latest stays above).</p>
+                  <p className="text-sm text-gray-500">Previous PDFs (latest stays above).</p>
                 </div>
                 <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
                   {olderQuotationVersions.length} version{olderQuotationVersions.length === 1 ? '' : 's'}
@@ -345,7 +524,7 @@ const Summary = () => {
               </div>
 
               <div className="space-y-3">
-                {olderQuotationVersions.map((version) => (
+                {visibleOlderQuotationVersions.map((version) => (
                   <div key={version.id} className="border border-gray-100 rounded-2xl p-4 bg-gray-50/60">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="min-w-0">
@@ -376,6 +555,18 @@ const Summary = () => {
                   </div>
                 ))}
               </div>
+
+              {olderQuotationVersions.length > 2 && (
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllQuotationVersions((prev) => !prev)}
+                    className="text-sm text-jira-blue hover:underline font-semibold"
+                  >
+                    {showAllQuotationVersions ? 'View less' : 'View more'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -452,6 +643,77 @@ const Summary = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-jira-gray flex items-center">
+              <FileText className="w-5 h-5 mr-2 text-jira-blue" />
+              Comments
+            </h2>
+            <span className="text-sm text-gray-500">{summaryComments.length}</span>
+          </div>
+
+          {canPostSummaryComment && (
+            <div className="mb-4">
+              <textarea
+                value={summaryCommentText}
+                onChange={(e) => setSummaryCommentText(e.target.value)}
+                rows={3}
+                placeholder="Write a comment..."
+                className="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-jira-gray placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
+              />
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleSubmitSummaryComment}
+                  disabled={submittingSummaryComment || !String(summaryCommentText || '').trim()}
+                  className="px-4 py-2 text-sm font-semibold rounded-full bg-gradient-to-r from-jira-blue to-jira-blue-light text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {submittingSummaryComment ? 'Posting...' : 'Post'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {summaryComments.length === 0 ? (
+            <div className="text-sm text-gray-500">No comments yet.</div>
+          ) : (
+            <div className="space-y-3">
+              {summaryComments
+                .slice()
+                .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                .map((comment) => {
+                  const authorName = comment?.author?.name || comment?.author?.username || 'Unknown';
+                  const authorUsername = normalizeIdentifier(comment?.author?.username);
+                  const viewerUsername = normalizeIdentifier(authUser?.username);
+                  const canDelete = authUser?.role === 'FULL_ACCESS' || (authorUsername && viewerUsername && authorUsername === viewerUsername);
+                  const when = formatDateTime(comment?.createdAt);
+                  return (
+                    <div key={comment._id || `${authorName}-${comment.createdAt}-${comment.text?.slice(0, 12)}`} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <div className="text-sm font-semibold text-jira-gray truncate">{authorName}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-xs text-gray-500 whitespace-nowrap">{when}</div>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSummaryComment(comment._id)}
+                              disabled={deletingSummaryCommentId === String(comment._id)}
+                              className="p-1.5 rounded-lg hover:bg-red-50 disabled:opacity-40"
+                              title="Delete comment"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-600" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap break-words">{comment.text}</div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>

@@ -74,17 +74,11 @@ const Home = () => {
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                 <Link 
-                  to="/signup"
+                  to="/auth?mode=signup"
                   className="bg-jira-blue text-white px-8 py-4 rounded-xl hover:bg-jira-blue-light transition-all duration-200 font-semibold shadow-lg hover:shadow-xl flex items-center justify-center group"
                 >
                   Get Started Free
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link 
-                  to="/login"
-                  className="border-2 border-gray-300 text-jira-gray px-8 py-4 rounded-xl hover:border-jira-blue hover:text-jira-blue transition-all duration-200 font-semibold flex items-center justify-center dark:border-white/30 dark:text-white dark:hover:text-jira-blue"
-                >
-                  Sign In
                 </Link>
               </div>
 
@@ -188,7 +182,7 @@ const Home = () => {
             Join thousands of teams already using ProjectFlow
           </p>
           <Link 
-            to="/signup"
+            to="/auth?mode=signup"
             className="inline-flex items-center bg-white text-jira-blue px-8 py-4 rounded-xl hover:shadow-2xl transition-all duration-200 font-semibold text-lg group"
           >
             Start Free Trial

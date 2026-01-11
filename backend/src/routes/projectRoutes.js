@@ -13,6 +13,8 @@ router.put('/:id', requirePermission('manageProjects'), projectController.update
 router.delete('/:id', requirePermission('manageProjects'), projectController.deleteProject);
 router.post('/:id/team', requireAnyPermission('manageProjects', 'manageTeamMembers'), projectController.addTeamMember);
 router.delete('/:id/team/:userId', requireAnyPermission('manageProjects', 'manageTeamMembers'), projectController.removeTeamMember);
+router.post('/:id/comments', requirePermission('viewProjects'), projectController.addProjectComment);
+router.delete('/:id/comments/:commentId', requirePermission('viewProjects'), projectController.deleteProjectComment);
 router.get('/:id/quotations', requirePermission('viewProjects'), projectController.getProjectQuotations);
 router.put('/:id/quotations', requireAdmin1, projectController.saveProjectQuotations);
 router.get('/:id/quotations/pdf', requirePermission('viewProjects'), projectController.streamProjectQuotationsPdf);

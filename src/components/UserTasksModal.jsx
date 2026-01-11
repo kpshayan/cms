@@ -1,9 +1,45 @@
 import { X, CheckCircle2, Clock, Circle, Edit2, ArrowRight } from 'lucide-react';
 
+const normalizeIdentifier = (value) => String(value ?? '').trim().toLowerCase();
+
+const doesTaskBelongToUser = (task, user) => {
+  if (!task || !user) return false;
+  const candidate = task.assignee;
+  if (!candidate) return false;
+
+  const userIdentifiers = [
+    user._id,
+    user.id,
+    user.username,
+    user.executorUsername,
+    user.email,
+    user.name,
+  ].map(normalizeIdentifier).filter(Boolean);
+  if (!userIdentifiers.length) return false;
+
+  if (typeof candidate === 'string' || typeof candidate === 'number') {
+    return userIdentifiers.includes(normalizeIdentifier(candidate));
+  }
+
+  const assigneeIdentifiers = [
+    candidate._id,
+    candidate.id,
+    candidate.username,
+    candidate.executorUsername,
+    candidate.email,
+    candidate.name,
+  ].map(normalizeIdentifier).filter(Boolean);
+
+  return assigneeIdentifiers.some((identifier) => userIdentifiers.includes(identifier));
+};
+
+const getTaskId = (task) => task?._id || task?.id;
+
 const UserTasksModal = ({ isOpen, onClose, user, tasks, onEditTask, canEditTasks = false }) => {
   if (!isOpen || !user) return null;
 
-  const userTasks = tasks.filter(t => t.assignee?.id === user.id);
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const userTasks = safeTasks.filter((t) => doesTaskBelongToUser(t, user));
   const completedTasks = userTasks.filter(t => t.status === 'done');
   const inProgressTasks = userTasks.filter(t => t.status === 'in-progress');
   const todoTasks = userTasks.filter(t => t.status === 'todo');
@@ -37,6 +73,8 @@ const UserTasksModal = ({ isOpen, onClose, user, tasks, onEditTask, canEditTasks
       }
     };
 
+    const taskId = getTaskId(task);
+
     return (
     <div 
       className={`group bg-white rounded-xl border-2 border-gray-200 p-4 hover:border-jira-blue hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:rotate-1 ${canEditTasks ? 'cursor-pointer' : 'cursor-default'}`}
@@ -51,7 +89,7 @@ const UserTasksModal = ({ isOpen, onClose, user, tasks, onEditTask, canEditTasks
             {getStatusIcon(task.status)}
           </div>
           <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded font-bold group-hover:bg-jira-blue group-hover:text-white transition-all duration-300">
-            {task.id}
+            {taskId}
           </span>
         </div>
         <span className={`text-xs px-2.5 py-1 rounded-full font-bold border ${getPriorityColor(task.priority)} transform group-hover:scale-110 transition-all duration-300`}>
@@ -193,7 +231,7 @@ const UserTasksModal = ({ isOpen, onClose, user, tasks, onEditTask, canEditTasks
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {todoTasks.map((task, index) => (
-                        <TaskCard key={task.id} task={task} delay={0.1 * index + 0.3} />
+                        <TaskCard key={getTaskId(task)} task={task} delay={0.1 * index + 0.3} />
                       ))}
                     </div>
                   </div>
@@ -211,7 +249,7 @@ const UserTasksModal = ({ isOpen, onClose, user, tasks, onEditTask, canEditTasks
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {inProgressTasks.map((task, index) => (
-                        <TaskCard key={task.id} task={task} delay={0.1 * index + 0.4} />
+                        <TaskCard key={getTaskId(task)} task={task} delay={0.1 * index + 0.4} />
                       ))}
                     </div>
                   </div>
@@ -229,7 +267,7 @@ const UserTasksModal = ({ isOpen, onClose, user, tasks, onEditTask, canEditTasks
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {completedTasks.map((task, index) => (
-                        <TaskCard key={task.id} task={task} delay={0.1 * index + 0.5} />
+                        <TaskCard key={getTaskId(task)} task={task} delay={0.1 * index + 0.5} />
                       ))}
                     </div>
                   </div>

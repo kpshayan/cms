@@ -1,5 +1,5 @@
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Layers, PanelLeftClose, PanelLeftOpen, LogOut, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Layers, PanelLeftClose, PanelLeftOpen, LogOut, Home, Shield } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
@@ -142,6 +142,16 @@ const Sidebar = () => {
 
       {/* Footer */}
       <div className="p-4 border-t-2 border-blue-100 dark:border-white/5 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-white/5 dark:to-transparent">
+        {user?.role === 'FULL_ACCESS' && (
+          <Link
+            to="/dashboard/roles"
+            className={`mb-3 w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-2'} px-3 py-3 rounded-xl text-jira-gray dark:text-gray-200 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 dark:hover:from-white/10 dark:hover:to-white/5 transition-all duration-300 font-semibold hover:scale-105 transform border-2 border-transparent hover:border-blue-200 dark:hover:border-white/10`}
+            title={collapsed ? 'Roles' : ''}
+          >
+            <Shield className="w-5 h-5" />
+            {!collapsed && <span className="font-medium">Roles</span>}
+          </Link>
+        )}
         {!collapsed && user && (
           <div className="mb-3 p-3 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-white/5 dark:to-white/0 rounded-xl border border-blue-200 dark:border-white/10 hover:shadow-md transition-all duration-300 transform hover:scale-105">
             <div className="flex items-center space-x-2">

@@ -1,9 +1,13 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 const INTERACTIVE_SELECTOR = [
   'a[href]',
   'button',
   '[role="button"]',
+  'select',
+  'textarea',
+  'input:not([type="hidden"])',
   'input[type="button"]',
   'input[type="submit"]',
   'input[type="reset"]',
@@ -107,7 +111,7 @@ const MagneticCursor = () => {
     };
   }, []);
 
-  return (
+  const content = (
     <div ref={rootRef} className="neon-cursor" aria-hidden="true" data-mode="cursor">
       <div ref={cursorRef} className="cursor-icon-layer">
         <svg
@@ -176,6 +180,12 @@ const MagneticCursor = () => {
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  return createPortal(content, document.body);
 };
 
 export default MagneticCursor;

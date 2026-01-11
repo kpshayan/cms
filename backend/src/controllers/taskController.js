@@ -33,6 +33,11 @@ const buildTaskFilter = (req) => {
 };
 
 const ensureTaskMutationAccess = (task, user) => {
+  if (user?.role === 'PROJECT_READ_ONLY') {
+    const err = new Error('You are not allowed to modify tasks.');
+    err.status = 403;
+    throw err;
+  }
   if (user?.permissions?.manageTasks) {
     return true;
   }
@@ -59,6 +64,17 @@ const ensureTaskViewAccess = (task, user) => {
     return true;
   }
   const err = new Error('You are not allowed to view this task.');
+  err.status = 403;
+  throw err;
+};
+
+const ensureTaskCommentAccess = (req) => {
+  const role = req.user?.role;
+  const allowedRoles = ['FULL_ACCESS', 'TASK_EDITOR', 'EXECUTOR', 'PROJECT_READ_ONLY'];
+  if (allowedRoles.includes(role)) {
+    return true;
+  }
+  const err = new Error('You are not allowed to comment on tasks.');
   err.status = 403;
   throw err;
 };
@@ -143,6 +159,71 @@ exports.updateStatus = asyncHandler(async (req, res) => {
   }
   ensureTaskMutationAccess(task, req.user);
   task.status = req.body.status || task.status;
+  await task.save();
+  return res.json(serializeTask(task));
+});
+
+exports.addComment = asyncHandler(async (req, res) => {
+  const task = await Task.findById(req.params.id);
+  if (!task) {
+    return res.status(404).json({ error: 'Task not found.' });
+  }
+
+  ensureTaskViewAccess(task, req.user);
+  ensureTaskCommentAccess(req);
+
+  const text = String(req.body?.text || '').trim();
+  if (!text) {
+    return res.status(400).json({ error: 'Comment text is required.' });
+  }
+
+  task.comments = Array.isArray(task.comments) ? task.comments : [];
+  task.comments.push({
+    text,
+    author: {
+      username: req.user?.username,
+      name: req.user?.name,
+      role: req.user?.role,
+    },
+    createdAt: new Date(),
+  });
+
+  await task.save();
+  return res.json(serializeTask(task));
+});
+
+exports.deleteComment = asyncHandler(async (req, res) => {
+  const task = await Task.findById(req.params.id);
+  if (!task) {
+    return res.status(404).json({ error: 'Task not found.' });
+  }
+
+  ensureTaskViewAccess(task, req.user);
+
+  const commentId = String(req.params.commentId || '').trim();
+  if (!commentId) {
+    return res.status(400).json({ error: 'commentId is required.' });
+  }
+
+  const list = Array.isArray(task.comments) ? task.comments : [];
+  const target = list.find((c) => String(c._id) === commentId);
+  if (!target) {
+    return res.status(404).json({ error: 'Comment not found.' });
+  }
+
+  const requester = req.user;
+  const requesterUsername = normalize(requester?.username);
+  const authorUsername = normalize(target?.author?.username);
+  const canDeleteAny = requester?.role === 'FULL_ACCESS';
+  const canDeleteOwn = requesterUsername && authorUsername && requesterUsername === authorUsername;
+
+  if (!canDeleteAny && !canDeleteOwn) {
+    const err = new Error('You are not allowed to delete this comment.');
+    err.status = 403;
+    throw err;
+  }
+
+  task.comments = list.filter((c) => String(c._id) !== commentId);
   await task.save();
   return res.json(serializeTask(task));
 });

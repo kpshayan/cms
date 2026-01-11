@@ -51,6 +51,13 @@ export const authAPI = {
   deleteExecutor: (username) => apiCall(`/auth/executors/${username}`, {
     method: 'DELETE',
   }),
+
+  // Role assignment (Owner/admin1 only)
+  getRoles: () => apiCall('/auth/roles'),
+  assignRole: ({ username, role }) => apiCall('/auth/roles/assign', {
+    method: 'POST',
+    body: JSON.stringify({ username, role }),
+  }),
 };
 
 // Projects API
@@ -66,6 +73,13 @@ export const projectAPI = {
     body: JSON.stringify(data) 
   }),
   delete: (id) => apiCall(`/projects/${id}`, { method: 'DELETE' }),
+  addComment: (id, text) => apiCall(`/projects/${id}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  }),
+  deleteComment: (id, commentId) => apiCall(`/projects/${id}/comments/${commentId}`, {
+    method: 'DELETE',
+  }),
   addTeamMember: (projectId, userId) => apiCall(`/projects/${projectId}/team`, {
     method: 'POST',
     body: JSON.stringify({ userId })
@@ -131,6 +145,13 @@ export const taskAPI = {
   create: (data) => apiCall('/tasks', { 
     method: 'POST', 
     body: JSON.stringify(data) 
+  }),
+  addComment: (id, text) => apiCall(`/tasks/${id}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  }),
+  deleteComment: (id, commentId) => apiCall(`/tasks/${id}/comments/${commentId}`, {
+    method: 'DELETE',
   }),
   update: (id, data) => apiCall(`/tasks/${id}`, { 
     method: 'PUT', 

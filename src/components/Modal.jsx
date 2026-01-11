@@ -1,7 +1,16 @@
 import { X } from 'lucide-react';
+import { useEffect } from 'react';
 
 const Modal = ({ isOpen, onClose, title, children, footer }) => {
   if (!isOpen) return null;
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   return (
     <>
@@ -17,7 +26,7 @@ const Modal = ({ isOpen, onClose, title, children, footer }) => {
 
       {/* Modal panel with slide and scale animation */}
       <div 
-        className="fixed inset-0 overflow-y-auto flex items-center justify-center p-4 pointer-events-none"
+        className="fixed inset-0 overflow-hidden flex items-center justify-center p-4 pointer-events-none"
         style={{ zIndex: 9999 }}
       >
         <div 

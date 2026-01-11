@@ -92,6 +92,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loadRoles = async () => {
+    ensureAdmin1();
+    try {
+      setError(null);
+      const data = await authAPI.getRoles();
+      return data.roles;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  const assignRole = async ({ username, role }) => {
+    ensureAdmin1();
+    try {
+      setError(null);
+      const data = await authAPI.assignRole({ username, role });
+      return data.roles;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
   const registerExecutorAccount = async ({ name, email, username }) => {
     ensureAdmin1();
     try {
@@ -149,6 +173,8 @@ export const AuthProvider = ({ children }) => {
       registerExecutorAccount,
       resetExecutorPassword,
       removeExecutorAccount,
+      loadRoles,
+      assignRole,
     }}>
       {children}
     </AuthContext.Provider>

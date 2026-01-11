@@ -6,6 +6,7 @@ import Summary from './Summary';
 import Backlog from './Backlog';
 import Board from './Board';
 import Quotations from './Quotations';
+import Roles from './Roles';
 import { useAuth } from '../context/AuthContext';
 import TaskDetails from './TaskDetails';
 import { useSidebar } from '../context/SidebarContext';
@@ -23,6 +24,9 @@ const Dashboard = () => {
         <Routes>
           {/* Dashboard Home */}
           <Route index element={<ProjectsOverview />} />
+
+          {/* Roles */}
+          <Route path="roles" element={<Roles />} />
           
           {/* Project routes */}
           <Route path="project/:id/*" element={

@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Upload, X } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import Modal from './Modal';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -26,6 +28,13 @@ const TaskModal = ({ isOpen, onClose, task = null, projectId }) => {
   const { addTask, updateTask, getProjectById } = useData();
   const { executors } = useAuth();
   const project = getProjectById(projectId);
+
+  const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false);
+  const assigneeButtonRef = useRef(null);
+  const assigneeMenuRef = useRef(null);
+  const assigneeListRef = useRef(null);
+  const [assigneeMenuStyle, setAssigneeMenuStyle] = useState(null);
+  const selectedAssigneeUsernameRef = useRef('');
 
   const assigneeOptions = (() => {
     const options = [];
@@ -60,12 +69,103 @@ const TaskModal = ({ isOpen, onClose, task = null, projectId }) => {
     return options;
   })();
 
+  useEffect(() => {
+    if (!assigneeMenuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      const clickedButton = assigneeButtonRef.current?.contains?.(target);
+      const clickedMenu = assigneeMenuRef.current?.contains?.(target);
+      if (!clickedButton && !clickedMenu) {
+        setAssigneeMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setAssigneeMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [assigneeMenuOpen]);
+
+  const computeAssigneeMenuPlacement = () => {
+    const trigger = assigneeButtonRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+
+    // estimate menu height: list max-h-56 (224px) + padding + borders
+    const estimatedListHeight = Math.min((assigneeOptions.length || 1) * 44, 224);
+    const estimatedMenuHeight = 12 + estimatedListHeight + 2;
+
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openUp = spaceBelow < estimatedMenuHeight + 12 && spaceAbove > spaceBelow;
+
+    const top = openUp
+      ? Math.max(8, rect.top - 6 - estimatedMenuHeight)
+      : Math.min(viewportHeight - 8 - estimatedMenuHeight, rect.bottom + 6);
+
+    const left = Math.max(8, Math.min(rect.left, viewportWidth - 8 - rect.width));
+
+    setAssigneeMenuStyle({
+      position: 'fixed',
+      left,
+      top,
+      width: rect.width,
+      zIndex: 10050,
+    });
+  };
+
+  useEffect(() => {
+    if (!assigneeMenuOpen) return;
+
+    computeAssigneeMenuPlacement();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!assigneeListRef.current) return;
+        const selectedUsername = selectedAssigneeUsernameRef.current;
+        if (!selectedUsername) {
+          assigneeListRef.current.scrollTop = 0;
+          return;
+        }
+        const safeValue = window?.CSS?.escape ? window.CSS.escape(selectedUsername) : selectedUsername;
+        const selectedEl = assigneeListRef.current.querySelector(`[data-value="${safeValue}"]`);
+        if (selectedEl?.scrollIntoView) {
+          selectedEl.scrollIntoView({ block: 'nearest' });
+        }
+      });
+    });
+  }, [assigneeMenuOpen, assigneeOptions.length]);
+
+  useEffect(() => {
+    if (!assigneeMenuOpen) return undefined;
+    const handleResize = () => computeAssigneeMenuPlacement();
+    const handleScroll = () => computeAssigneeMenuPlacement();
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [assigneeMenuOpen, assigneeOptions.length]);
+
   const buildInitialTaskState = (overrides = {}) => ({
     title: '',
     description: '',
     status: 'todo',
     priority: 'medium',
-    assignee: overrides.assignee ?? assigneeOptions[0] ?? null,
+    assignee: overrides.assignee ?? null,
     projectId,
     projectKey: project?.key || 'TASK',
     type: 'task',
@@ -77,9 +177,14 @@ const TaskModal = ({ isOpen, onClose, task = null, projectId }) => {
   const [uploadedFiles, setUploadedFiles] = useState(task?.attachments || []);
 
   useEffect(() => {
+    selectedAssigneeUsernameRef.current = formData.assignee?.username || '';
+  }, [formData.assignee?.username]);
+
+  useEffect(() => {
     if (!isOpen) {
       setFormData(buildInitialTaskState());
       setUploadedFiles([]);
+      setAssigneeMenuOpen(false);
       return;
     }
 
@@ -94,6 +199,7 @@ const TaskModal = ({ isOpen, onClose, task = null, projectId }) => {
     } else {
       setFormData(buildInitialTaskState());
       setUploadedFiles([]);
+      setAssigneeMenuOpen(false);
     }
   }, [task, isOpen, projectId, project?.key, executors, project?.team]);
 
@@ -346,18 +452,76 @@ const TaskModal = ({ isOpen, onClose, task = null, projectId }) => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Assignee
           </label>
-          <select
-            name="assignee"
-            value={formData.assignee?.username || ''}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-jira-blue focus:border-transparent"
-            disabled={!assigneeOptions.length}
-          >
-            <option value="">Select a team member...</option>
-            {assigneeOptions.map(user => (
-              <option key={user.username} value={user.username}>{user.name} ({user.username})</option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              ref={assigneeButtonRef}
+              type="button"
+              disabled={!assigneeOptions.length}
+              onClick={() => {
+                if (!assigneeOptions.length) return;
+                setAssigneeMenuOpen((prev) => !prev);
+              }}
+              className="w-full h-14 px-5 bg-gray-50 border border-gray-200 rounded-2xl text-lg focus:outline-none text-left flex items-center justify-between gap-3"
+              aria-haspopup="listbox"
+              aria-expanded={assigneeMenuOpen}
+            >
+              <span className="truncate text-jira-gray">
+                {formData.assignee?.name
+                  ? `${formData.assignee.name} (${formData.assignee.username})`
+                  : 'Select a team member...'}
+              </span>
+              <ChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />
+            </button>
+
+            {assigneeMenuOpen && assigneeMenuStyle && typeof document !== 'undefined' && createPortal(
+              <div ref={assigneeMenuRef} style={assigneeMenuStyle} role="listbox" tabIndex={-1}>
+                <div className="rounded-xl border border-gray-200 shadow-lg overflow-hidden bg-white/90 backdrop-blur-md">
+                  <div ref={assigneeListRef} className="max-h-56 overflow-y-auto p-1.5">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={!formData.assignee}
+                      onClick={() => {
+                        setFormData((prev) => ({ ...prev, assignee: null }));
+                        setAssigneeMenuOpen(false);
+                      }}
+                      className={
+                        `w-full text-left px-3 py-2.5 rounded-lg transition text-base ` +
+                        (!formData.assignee
+                          ? 'bg-jira-bg/40 font-semibold text-jira-gray'
+                          : 'text-gray-700 hover:bg-gray-50')
+                      }
+                    >
+                      Select a team member...
+                    </button>
+
+                    {assigneeOptions.map((user) => (
+                      <button
+                        key={user.username}
+                        type="button"
+                        role="option"
+                        data-value={user.username}
+                        aria-selected={normalizeUsername(user.username) === normalizeUsername(formData.assignee?.username || '')}
+                        onClick={() => {
+                          setFormData((prev) => ({ ...prev, assignee: user }));
+                          setAssigneeMenuOpen(false);
+                        }}
+                        className={
+                          `w-full text-left px-3 py-2.5 rounded-lg transition text-base ` +
+                          (normalizeUsername(user.username) === normalizeUsername(formData.assignee?.username || '')
+                            ? 'bg-jira-bg/40 font-semibold text-jira-gray'
+                            : 'text-gray-700 hover:bg-gray-50')
+                        }
+                      >
+                        {user.name} ({user.username})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>,
+              document.body
+            )}
+          </div>
           {!assigneeOptions.length && (
             <p className="text-xs text-red-500 mt-2">Add a team member to this project before assigning tasks.</p>
           )}

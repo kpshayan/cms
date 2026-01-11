@@ -3,9 +3,7 @@ import Modal from './Modal';
 import { useData } from '../context/DataContext';
 
 const createInitialFormState = () => ({
-  name: '',
-  description: '',
-  color: '#0052CC'
+  name: ''
 });
 
 const ProjectModal = ({ isOpen, onClose, project = null, onSubmit }) => {
@@ -15,19 +13,12 @@ const ProjectModal = ({ isOpen, onClose, project = null, onSubmit }) => {
   useEffect(() => {
     if (project) {
       setFormData({
-        name: project.name || '',
-        description: project.description || '',
-        color: project.color || '#0052CC'
+        name: project.name || ''
       });
     } else {
       setFormData(createInitialFormState());
     }
   }, [project, isOpen]);
-
-  const colors = [
-    '#0052CC', '#00875A', '#FF5630', '#6554C0', 
-    '#00B8D9', '#36B37E', '#FFAB00', '#FF8B00'
-  ];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -81,39 +72,6 @@ const ProjectModal = ({ isOpen, onClose, project = null, onSubmit }) => {
             <p className="text-xs text-gray-500 mt-1 dark:text-gray-400">System assigned key – cannot be edited.</p>
           </div>
         )}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Description
-          </label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            rows={3}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-jira-blue focus:border-transparent"
-            placeholder="Brief description of the project"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Project Color
-          </label>
-          <div className="flex gap-2 flex-wrap">
-            {colors.map(color => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => setFormData({ ...formData, color })}
-                className={`w-10 h-10 rounded-lg transition-all ${
-                  formData.color === color ? 'ring-2 ring-offset-2 ring-jira-blue scale-110' : ''
-                }`}
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
-        </div>
 
         <div className="flex gap-3 pt-4">
           <button

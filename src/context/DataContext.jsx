@@ -196,6 +196,11 @@ export const DataProvider = ({ children }) => {
   };
 
   const ensureTaskMutationAccess = (taskId, defaultMessage) => {
+    if (user?.role === 'PROJECT_READ_ONLY') {
+      const message = defaultMessage || 'You do not have permission to modify tasks.';
+      setError(message);
+      throw new Error(message);
+    }
     if (canManageAllTasks) {
       return;
     }
@@ -318,9 +323,7 @@ export const DataProvider = ({ children }) => {
     try {
       const newProject = await projectAPI.create({
         name: project.name,
-        key: projectKey,
-        description: project.description,
-        color: project.color
+        key: projectKey
       });
       setProjects(prev => [...prev, newProject]);
       setError(null);
@@ -339,6 +342,30 @@ export const DataProvider = ({ children }) => {
       return updated;
     } catch (err) {
       return handleBackendError(err, 'Failed to update project.');
+    }
+  };
+
+  const addProjectComment = async (projectId, text) => {
+    if (!projectId) return null;
+    try {
+      const updated = await projectAPI.addComment(projectId, text);
+      setProjects(prev => prev.map(p => (String(p._id || p.id) === String(projectId) ? updated : p)));
+      setError(null);
+      return updated;
+    } catch (err) {
+      return handleBackendError(err, 'Failed to add comment.');
+    }
+  };
+
+  const deleteProjectComment = async (projectId, commentId) => {
+    if (!projectId || !commentId) return null;
+    try {
+      const updated = await projectAPI.deleteComment(projectId, commentId);
+      setProjects(prev => prev.map(p => (String(p._id || p.id) === String(projectId) ? updated : p)));
+      setError(null);
+      return updated;
+    } catch (err) {
+      return handleBackendError(err, 'Failed to delete comment.');
     }
   };
 
@@ -399,6 +426,30 @@ export const DataProvider = ({ children }) => {
       return updated;
     } catch (err) {
       return handleBackendError(err, 'Failed to update task status.');
+    }
+  };
+
+  const addTaskComment = async (taskId, text) => {
+    if (!taskId) return null;
+    try {
+      const updated = await taskAPI.addComment(taskId, text);
+      setTasks(prev => prev.map(t => (String(t._id || t.id) === String(taskId) ? updated : t)));
+      setError(null);
+      return updated;
+    } catch (err) {
+      return handleBackendError(err, 'Failed to add comment.');
+    }
+  };
+
+  const deleteTaskComment = async (taskId, commentId) => {
+    if (!taskId || !commentId) return null;
+    try {
+      const updated = await taskAPI.deleteComment(taskId, commentId);
+      setTasks(prev => prev.map(t => (String(t._id || t.id) === String(taskId) ? updated : t)));
+      setError(null);
+      return updated;
+    } catch (err) {
+      return handleBackendError(err, 'Failed to delete comment.');
     }
   };
 
@@ -665,11 +716,15 @@ export const DataProvider = ({ children }) => {
       error,
       addProject,
       updateProject,
+      addProjectComment,
+      deleteProjectComment,
       deleteProject,
       addTask,
       updateTask,
       deleteTask,
       updateTaskStatus,
+      addTaskComment,
+      deleteTaskComment,
       addUser,
       updateUser,
       deleteUser,

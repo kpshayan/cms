@@ -10,6 +10,10 @@ router.post('/reset', authController.resetAccount);
 router.get('/me', authenticate, authController.getProfile);
 router.post('/logout', authenticate, authController.logout);
 
+// Role assignment (Owner/admin1 only)
+router.get('/roles', authenticate, requireAdmin1, authController.getRoleAssignments);
+router.post('/roles/assign', authenticate, requireAdmin1, authController.assignRole);
+
 router.get('/executors', authenticate, authController.listExecutors);
 router.post('/executors', authenticate, requireAdmin1, authController.createExecutor);
 router.patch('/executors/:username', authenticate, requireAdmin1, authController.updateExecutor);

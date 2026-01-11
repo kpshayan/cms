@@ -7,10 +7,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import MagneticCursor from './components/MagneticCursor';
 import ThemeToggle from './components/ThemeToggle';
 import Home from './pages/Home';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
 import Features from './pages/Features';
 import Dashboard from './pages/Dashboard';
+import Auth from './pages/Auth';
 
 function AppShell() {
   useTheme();
@@ -30,8 +29,9 @@ function AppShell() {
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/login" element={<Auth />} />
+              <Route path="/signup" element={<Auth />} />
               <Route path="/features" element={<Features />} />
               <Route path="/pricing" element={<Home />} />
               

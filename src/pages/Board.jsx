@@ -22,10 +22,10 @@ const Board = () => {
   const allTasks = getTasksByProject(id);
   const canAddTasks = hasPermission('manageTasks');
   const canManageTasks = hasPermission('manageTasks');
-  const canManageOwnTasks = Boolean(user?.permissions?.manageOwnTasks);
+  const canManageOwnTasks = hasPermission('manageOwnTasks');
   const canViewTasks = hasPermission('viewTasks');
   const canOpenTasks = canManageTasks || canManageOwnTasks || canViewTasks;
-  const canDragTasks = canManageTasks || canManageOwnTasks;
+  const canDragTasks = user?.role !== 'PROJECT_READ_ONLY' && (canManageTasks || canManageOwnTasks);
   
   const [draggedTask, setDraggedTask] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -131,7 +131,7 @@ const Board = () => {
             {taskId}
           </span>
         </div>
-        <GripVertical className="w-5 h-5 text-gray-400" />
+        {canDragTasks && <GripVertical className="w-5 h-5 text-gray-400" />}
       </div>
       
       <h3 className="text-sm font-semibold text-jira-gray dark:text-[var(--text-primary)] mb-2 leading-snug line-clamp-2">
@@ -199,7 +199,9 @@ const Board = () => {
             {columnTasks.length === 0 && (
               <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-300 dark:border-white/10 rounded-xl bg-white/50 dark:bg-white/5 backdrop-blur-sm">
                 <Circle className="w-10 h-10 text-gray-300 dark:text-white/15 mb-2" />
-                <p className="text-sm text-gray-400 dark:text-[var(--text-secondary)] font-medium">Drop tasks here</p>
+                <p className="text-sm text-gray-400 dark:text-[var(--text-secondary)] font-medium">
+                  {canDragTasks ? 'Drop tasks here' : 'No tasks'}
+                </p>
               </div>
             )}
           </div>
@@ -219,7 +221,9 @@ const Board = () => {
             Board
           </h1>
           <p className="text-gray-600 text-lg dark:text-[var(--text-secondary)]">
-            Click a card to view details, or click and drag it into another column to update its status.
+            {canDragTasks
+              ? 'Click a card to view details, or click and drag it into another column to update its status.'
+              : 'Click a card to view details.'}
           </p>
         </div>
         {canAddTasks && (

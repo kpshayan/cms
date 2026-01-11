@@ -3,6 +3,19 @@ const Task = require('../models/Task');
 const TeamMember = require('../models/TeamMember');
 const asyncHandler = require('../utils/asyncHandler');
 
+const normalize = (value) => String(value || '').trim().toLowerCase();
+
+const ensureProjectCommentAccess = (req) => {
+  const role = req.user?.role;
+  const allowedRoles = ['FULL_ACCESS', 'TASK_EDITOR', 'EXECUTOR', 'PROJECT_READ_ONLY'];
+  if (allowedRoles.includes(role)) {
+    return true;
+  }
+  const err = new Error('You are not allowed to comment on projects.');
+  err.status = 403;
+  throw err;
+};
+
 const buildProjectPayload = async (projectDoc) => {
   const project = await projectDoc.populate('team');
   return project;
@@ -124,6 +137,25 @@ exports.updateProject = asyncHandler(async (req, res) => {
   if (req.body.description !== undefined) project.description = req.body.description;
   if (req.body.color) project.color = req.body.color;
   if (req.body.status) project.status = req.body.status;
+
+  if (req.body.quotationDetails !== undefined) {
+    const next = req.body.quotationDetails;
+    if (next === null) {
+      project.quotationDetails = undefined;
+    } else if (typeof next === 'object') {
+      project.quotationDetails = project.quotationDetails || {};
+      const allowedKeys = ['name', 'production', 'project', 'type', 'producer', 'contact'];
+      allowedKeys.forEach((key) => {
+        if (next[key] !== undefined) {
+          project.quotationDetails[key] = next[key];
+        }
+      });
+    }
+  }
+
+  if (req.body.quotationDetailsFinalized !== undefined) {
+    project.quotationDetailsFinalized = Boolean(req.body.quotationDetailsFinalized);
+  }
 
   await project.save();
   const hydrated = await buildProjectPayload(project);
@@ -291,4 +323,65 @@ exports.streamProjectQuotationVersionPdf = asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', version.pdfData?.contentType || 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
   return res.send(pdfBuffer);
+});
+
+exports.addProjectComment = asyncHandler(async (req, res) => {
+  const project = await Project.findById(req.params.id).populate('team');
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found.' });
+  }
+
+  ensureProjectCommentAccess(req);
+
+  const text = String(req.body?.text || '').trim();
+  if (!text) {
+    return res.status(400).json({ error: 'Comment text is required.' });
+  }
+
+  project.summaryComments = Array.isArray(project.summaryComments) ? project.summaryComments : [];
+  project.summaryComments.push({
+    text,
+    author: {
+      username: req.user?.username,
+      name: req.user?.name,
+      role: req.user?.role,
+    },
+    createdAt: new Date(),
+  });
+
+  await project.save();
+  return res.json(serializeProject(project));
+});
+
+exports.deleteProjectComment = asyncHandler(async (req, res) => {
+  const project = await Project.findById(req.params.id).populate('team');
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found.' });
+  }
+
+  const commentId = String(req.params.commentId || '').trim();
+  if (!commentId) {
+    return res.status(400).json({ error: 'commentId is required.' });
+  }
+
+  const list = Array.isArray(project.summaryComments) ? project.summaryComments : [];
+  const target = list.find((c) => String(c._id) === commentId);
+  if (!target) {
+    return res.status(404).json({ error: 'Comment not found.' });
+  }
+
+  const requesterUsername = normalize(req.user?.username);
+  const authorUsername = normalize(target?.author?.username);
+  const canDeleteAny = req.user?.role === 'FULL_ACCESS';
+  const canDeleteOwn = requesterUsername && authorUsername && requesterUsername === authorUsername;
+
+  if (!canDeleteAny && !canDeleteOwn) {
+    const err = new Error('You are not allowed to delete this comment.');
+    err.status = 403;
+    throw err;
+  }
+
+  project.summaryComments = list.filter((c) => String(c._id) !== commentId);
+  await project.save();
+  return res.json(serializeProject(project));
 });

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Pencil, Check, X, FileText, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Check, X, Trash2, FileText, ChevronDown } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { jsPDF } from 'jspdf';
@@ -55,11 +55,29 @@ const FIELD_SEQUENCE = [
   { key: 'pitchDeck', label: 'Pitch Deck' },
   { key: 'mainRollingCredits', label: 'Main & Rolling Credits' },
   { key: 'trailerTeaserCredits', label: 'Trailer and Teaser Credits' },
-  { key: 'number', label: 'Number', type: 'number' },
-  { key: 'owner', label: 'Owner' },
-  { key: 'producer', label: 'Producer' },
-  { key: 'productionHouse', label: 'Production House' },
 ];
+
+const DETAILS_FIELDS = [
+  { key: 'name', label: 'Name' },
+  { key: 'production', label: 'Production' },
+  { key: 'project', label: 'Project' },
+  { key: 'type', label: 'Type' },
+  { key: 'producer', label: 'Producer' },
+  { key: 'contact', label: 'Contact' },
+];
+
+const FIELD_SEQUENCE_KEY_SET = new Set(FIELD_SEQUENCE.map((field) => field.key));
+const FIELD_SEQUENCE_LABEL_MAP = new Map(FIELD_SEQUENCE.map((field) => [field.key, field.label]));
+
+const sanitizeQuotationEntries = (entries) => {
+  const list = Array.isArray(entries) ? entries : [];
+  return list
+    .filter((entry) => entry && FIELD_SEQUENCE_KEY_SET.has(entry.key))
+    .map((entry) => ({
+      ...entry,
+      label: FIELD_SEQUENCE_LABEL_MAP.get(entry.key) || entry.label,
+    }));
+};
 
 const Quotations = () => {
   const { id } = useParams();
@@ -69,10 +87,11 @@ const Quotations = () => {
     saveQuotationsForProject,
     loadQuotationsForProject,
     getQuotationsForProject,
+    updateProject,
   } = useData();
   const project = getProjectById(id);
   const projectId = project?._id || project?.id || id;
-  const [selectedFieldKey, setSelectedFieldKey] = useState(FIELD_SEQUENCE[0]?.key || '');
+  const [selectedFieldKey, setSelectedFieldKey] = useState('');
   const [currentValue, setCurrentValue] = useState('');
   const [responses, setResponses] = useState([]);
   const [error, setError] = useState('');
@@ -82,6 +101,19 @@ const Quotations = () => {
   const [submitError, setSubmitError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isFieldMenuOpen, setIsFieldMenuOpen] = useState(false);
+
+  const [detailsDraft, setDetailsDraft] = useState({
+    name: '',
+    production: '',
+    project: '',
+    type: '',
+    producer: '',
+    contact: '',
+  });
+  const [isEditingDetails, setIsEditingDetails] = useState(true);
+  const [detailsError, setDetailsError] = useState('');
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+
   const nextFieldRef = useRef(null);
   const fieldMenuRef = useRef(null);
   const existingQuotations = getQuotationsForProject(projectId);
@@ -90,7 +122,7 @@ const Quotations = () => {
 
   const filledKeys = new Set((responses || []).map((entry) => entry?.key).filter(Boolean));
   const availableFields = FIELD_SEQUENCE.filter((field) => !filledKeys.has(field.key));
-  const selectedField = availableFields.find((field) => field.key === selectedFieldKey) || availableFields[0];
+  const selectedField = availableFields.find((field) => field.key === selectedFieldKey) || null;
 
   useEffect(() => {
     if (!projectId) return;
@@ -110,10 +142,7 @@ const Quotations = () => {
 
     const draftResponses = Array.isArray(draft.responses) ? draft.responses : [];
     if (draftResponses.length) {
-      setResponses(draftResponses);
-    }
-    if (typeof draft.selectedFieldKey === 'string') {
-      setSelectedFieldKey(draft.selectedFieldKey);
+      setResponses(sanitizeQuotationEntries(draftResponses));
     }
     if (typeof draft.currentValue === 'string') {
       setCurrentValue(draft.currentValue);
@@ -128,7 +157,7 @@ const Quotations = () => {
     if (!draftRestoredRef.current) return;
     const draft = readDraft(projectId);
     if (draft?.responses?.length) return;
-    setResponses(existingQuotations.entries);
+    setResponses(sanitizeQuotationEntries(existingQuotations.entries));
   }, [existingQuotations?.entries, responses.length, projectId]);
 
   useEffect(() => {
@@ -145,13 +174,28 @@ const Quotations = () => {
   }, [projectId, responses, selectedFieldKey, currentValue]);
 
   useEffect(() => {
+    if (!projectId) return;
+    const initial = project?.quotationDetails || {};
+    setDetailsDraft((prev) => ({
+      ...prev,
+      name: typeof initial.name === 'string' ? initial.name : prev.name,
+      production: typeof initial.production === 'string' ? initial.production : prev.production,
+      project: typeof initial.project === 'string' ? initial.project : prev.project,
+      type: typeof initial.type === 'string' ? initial.type : prev.type,
+      producer: typeof initial.producer === 'string' ? initial.producer : prev.producer,
+      contact: typeof initial.contact === 'string' ? initial.contact : prev.contact,
+    }));
+    setIsEditingDetails(!project?.quotationDetailsFinalized);
+  }, [projectId, project?.quotationDetailsFinalized, project?.quotationDetails]);
+
+  useEffect(() => {
     if (!availableFields.length) {
       setSelectedFieldKey('');
       setIsFieldMenuOpen(false);
       return;
     }
-    if (!selectedFieldKey || !availableFields.some((field) => field.key === selectedFieldKey)) {
-      setSelectedFieldKey(availableFields[0].key);
+    if (selectedFieldKey && !availableFields.some((field) => field.key === selectedFieldKey)) {
+      setSelectedFieldKey('');
     }
   }, [availableFields, selectedFieldKey]);
 
@@ -194,6 +238,41 @@ const Quotations = () => {
         y = 20;
       }
     });
+
+    const detailsFinalized = Boolean(project?.quotationDetailsFinalized);
+    const details = project?.quotationDetails || detailsDraft;
+    const hasAnyDetails = DETAILS_FIELDS.some((field) => String(details?.[field.key] || '').trim());
+
+    if (detailsFinalized && hasAnyDetails) {
+      const sectionTitle = 'Details';
+      const needsNewPage = y > 250;
+      if (needsNewPage) {
+        doc.addPage();
+        y = 20;
+      } else {
+        y += 10;
+      }
+
+      doc.setFontSize(13);
+      doc.text(sectionTitle, 20, y);
+      y += 6;
+
+      const boxX = 18;
+      const boxY = y;
+      const boxW = 174;
+
+      doc.setFontSize(11);
+      let textY = y + 8;
+      DETAILS_FIELDS.forEach((field) => {
+        const value = String(details?.[field.key] || '').trim();
+        doc.text(`${field.label}: ${value}`, 22, textY);
+        textY += 7;
+      });
+
+      const boxH = Math.max(10, textY - boxY + 2);
+      doc.rect(boxX, boxY, boxW, boxH);
+    }
+
     return doc.output('blob');
   };
 
@@ -209,6 +288,10 @@ const Quotations = () => {
 
   const finalizeQuotations = async (entries) => {
     if (!projectId || isSaving) return;
+    if (!project?.quotationDetailsFinalized) {
+      setSubmitError('Please finalize the details box before generating the PDF.');
+      return;
+    }
     setIsSaving(true);
     setSubmitError('');
     try {
@@ -248,8 +331,51 @@ const Quotations = () => {
     const nextEntries = [...responses, { ...selectedField, value: trimmedValue }];
     setResponses(nextEntries);
     setCurrentValue('');
+    setSelectedFieldKey('');
     setError('');
     setSubmitError('');
+  };
+
+  const handleFinalizeDetails = async () => {
+    if (!projectId || isSavingDetails) return;
+    setDetailsError('');
+    setSubmitError('');
+
+    const missing = DETAILS_FIELDS.filter((field) => !String(detailsDraft[field.key] || '').trim());
+    if (missing.length) {
+      setDetailsError('Please fill all details fields before finalizing.');
+      return;
+    }
+
+    setIsSavingDetails(true);
+    try {
+      await updateProject(projectId, {
+        quotationDetails: detailsDraft,
+        quotationDetailsFinalized: true,
+      });
+      setIsEditingDetails(false);
+    } catch (err) {
+      setDetailsError(err?.message || 'Unable to save details.');
+    } finally {
+      setIsSavingDetails(false);
+    }
+  };
+
+  const handleEditDetails = async () => {
+    if (!projectId || isSavingDetails) return;
+    setDetailsError('');
+    setSubmitError('');
+    setIsSavingDetails(true);
+    try {
+      await updateProject(projectId, {
+        quotationDetailsFinalized: false,
+      });
+      setIsEditingDetails(true);
+    } catch (err) {
+      setDetailsError(err?.message || 'Unable to enable editing.');
+    } finally {
+      setIsSavingDetails(false);
+    }
   };
 
   const handleKeyPress = (event) => {
@@ -271,6 +397,23 @@ const Quotations = () => {
     setEditError('');
   };
 
+  const clearEditValue = () => {
+    setEditingValue('');
+    setEditError('');
+  };
+
+  const deleteEntry = (index) => {
+    setResponses((prev) => prev.filter((_, idx) => idx !== index));
+    setError('');
+    setSubmitError('');
+
+    if (editingIndex === index) {
+      cancelEdit();
+    } else if (editingIndex !== null && editingIndex > index) {
+      setEditingIndex((prev) => (prev === null ? null : prev - 1));
+    }
+  };
+
   const saveEdit = () => {
     if (editingIndex === null) return;
     const target = responses[editingIndex];
@@ -284,13 +427,6 @@ const Quotations = () => {
     )));
     cancelEdit();
   };
-
-  useEffect(() => {
-    if (!project) return;
-    if (nextFieldRef.current) {
-      nextFieldRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [project, responses.length]);
 
   if (!project) {
     return (
@@ -307,12 +443,62 @@ const Quotations = () => {
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="bg-white dark:bg-[var(--bg-surface)] border-2 border-jira-blue/15 dark:border-white/10 rounded-3xl p-8 shadow-xl">
           <div className="flex flex-col gap-8">
+            <div className="rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200/60 dark:border-white/10 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-xs uppercase tracking-wide font-semibold text-jira-gray dark:text-white">Details</p>
+                {isEditingDetails ? (
+                  <button
+                    type="button"
+                    onClick={handleFinalizeDetails}
+                    disabled={isSavingDetails}
+                    className="w-9 h-9 rounded-full border-2 border-green-500 text-green-600 flex items-center justify-center hover:bg-green-500 hover:text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Finalize"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleEditDetails}
+                    disabled={isSavingDetails}
+                    className="w-9 h-9 rounded-full border-2 border-jira-blue text-jira-blue flex items-center justify-center hover:bg-jira-blue hover:text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Edit"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {DETAILS_FIELDS.map((field) => (
+                  <div key={field.key}>
+                    <p className="text-xs uppercase tracking-wide text-gray-500">{field.label}</p>
+                    {isEditingDetails ? (
+                      <input
+                        value={detailsDraft[field.key]}
+                        onChange={(e) => setDetailsDraft((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                        className="mt-1 w-full h-11 px-4 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
+                        placeholder={field.label}
+                        disabled={isSavingDetails}
+                      />
+                    ) : (
+                      <p className="mt-1 text-sm font-semibold text-jira-gray dark:text-white break-words">
+                        {String(project?.quotationDetails?.[field.key] || detailsDraft[field.key] || '').trim()}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {detailsError && <p className="mt-3 text-sm text-red-500">{detailsError}</p>}
+            </div>
+
             {responses.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {responses.map((entry, idx) => (
                   <div
                     key={entry.key}
-                    className="rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200/60 dark:border-white/10 p-5"
+                    className="rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200/60 dark:border-white/10 p-3"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -326,42 +512,49 @@ const Quotations = () => {
                           <>
                             <button
                               onClick={saveEdit}
-                              className="w-11 h-11 rounded-full border-2 border-green-500 text-green-600 flex items-center justify-center hover:bg-green-500 hover:text-white transition"
+                              className="w-8 h-8 rounded-full border-2 border-green-500 text-green-600 flex items-center justify-center hover:bg-green-500 hover:text-white transition"
                               title="Save"
                             >
-                              <Check className="w-5 h-5" />
+                              <Check className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={cancelEdit}
-                              className="w-11 h-11 rounded-full border-2 border-red-400 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition"
-                              title="Cancel"
+                              onClick={clearEditValue}
+                              className="w-8 h-8 rounded-full border-2 border-red-400 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition"
+                              title="Clear"
                             >
-                              <X className="w-5 h-5" />
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => deleteEntry(idx)}
+                              className="w-8 h-8 rounded-full border-2 border-gray-300 text-gray-700 flex items-center justify-center hover:bg-gray-800 hover:text-white hover:border-gray-800 transition"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </>
                         ) : (
                           <button
                             onClick={() => startEdit(idx)}
-                            className="w-11 h-11 rounded-full border-2 border-jira-blue text-jira-blue flex items-center justify-center hover:bg-jira-blue hover:text-white transition"
+                            className="w-8 h-8 rounded-full border-2 border-jira-blue text-jira-blue flex items-center justify-center hover:bg-jira-blue hover:text-white transition"
                             title="Edit"
                           >
-                            <Pencil className="w-5 h-5" />
+                            <Pencil className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
                     </div>
 
-                    <div className="mt-3">
+                    <div className="mt-2">
                       {editingIndex === idx ? (
                         <input
                           type={entry.type || 'text'}
                           value={editingValue}
                           onChange={(e) => setEditingValue(e.target.value)}
-                          className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-3 px-4 text-base focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
+                          className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
                           placeholder={`Update ${entry.label}`}
                         />
                       ) : (
-                        <p className="text-lg font-semibold text-jira-gray dark:text-white break-words">
+                        <p className="text-sm font-semibold text-jira-gray dark:text-white break-words">
                           {entry.value}
                         </p>
                       )}
@@ -376,22 +569,19 @@ const Quotations = () => {
             )}
 
             <div ref={nextFieldRef} className="py-6 relative">
-              <p className="text-xs uppercase tracking-wide text-gray-500">Add Field</p>
-
               {availableFields.length > 0 ? (
                 <>
                   <div className="mt-4 flex flex-col md:flex-row md:items-end gap-4">
-                    <div className="relative" ref={fieldMenuRef}>
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Select Field</p>
+                    <div className="relative w-full md:w-80 lg:w-96" ref={fieldMenuRef}>
                       <button
                         type="button"
                         disabled={isSaving}
                         onClick={() => setIsFieldMenuOpen((prev) => !prev)}
-                        className="mt-2 w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none text-left flex items-center justify-between gap-3"
+                        className="w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none text-left flex items-center justify-between gap-3"
                         aria-haspopup="listbox"
                         aria-expanded={isFieldMenuOpen}
                       >
-                        <span className="truncate text-jira-gray dark:text-white">{selectedField?.label || 'Select a field'}</span>
+                        <span className="truncate text-jira-gray dark:text-white">{selectedField?.label || 'Select a service'}</span>
                         <ChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />
                       </button>
 
@@ -429,15 +619,14 @@ const Quotations = () => {
                       )}
                     </div>
 
-                    <div className="md:flex-1">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Value</p>
+                    <div className="w-full md:w-72 lg:w-80">
                       <input
                         type={selectedField?.type || 'text'}
                         value={currentValue}
                         onChange={(e) => setCurrentValue(e.target.value)}
                         onKeyDown={handleKeyPress}
-                        className="mt-2 w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none"
-                        placeholder={selectedField ? `Enter ${selectedField.label}` : 'Enter value'}
+                        className="w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none"
+                        placeholder="₹ 00000"
                         disabled={isSaving}
                       />
                     </div>
