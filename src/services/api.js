@@ -1,4 +1,33 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const DEFAULT_API_BASE = '/api';
+
+const isLocalHost = (hostname = '') => hostname === 'localhost' || hostname === '127.0.0.1';
+
+const resolveApiBase = () => {
+  const configured = import.meta.env.VITE_API_URL;
+  if (!configured) return DEFAULT_API_BASE;
+
+  if (typeof window === 'undefined') return configured;
+
+  const currentHost = window.location.hostname;
+  const currentOrigin = window.location.origin;
+
+  // In production, prefer same-origin '/api' so auth cookies remain first-party.
+  // Mobile browsers often block third-party cookies, which breaks cross-origin session auth.
+  try {
+    const resolved = new URL(configured, currentOrigin);
+    const isCrossOrigin = resolved.origin !== currentOrigin;
+    if (!isLocalHost(currentHost) && isCrossOrigin) {
+      return DEFAULT_API_BASE;
+    }
+  } catch {
+    // If env is malformed, fall back to same-origin.
+    return DEFAULT_API_BASE;
+  }
+
+  return configured;
+};
+
+const API_BASE = resolveApiBase();
 
 const apiCall = async (url, options = {}) => {
   const headers = {

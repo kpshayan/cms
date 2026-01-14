@@ -9,6 +9,12 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [executors, setExecutors] = useState([]);
 
+  // Best-effort warm-up to reduce Azure Functions cold-start latency.
+  // Uses credentials so the browser also establishes cookie context early.
+  useEffect(() => {
+    fetch('/api/health', { credentials: 'include' }).catch(() => {});
+  }, []);
+
   const loadExecutors = useCallback(async () => {
     try {
       const data = await authAPI.getExecutors();
