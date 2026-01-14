@@ -332,7 +332,9 @@ const Quotations = () => {
       return;
     }
 
-    const trimmedValue = selectedField.type === 'number' ? currentValue : currentValue.trim();
+    const trimmedValue = selectedField.type === 'number'
+      ? String(currentValue || '').replace(/\D/g, '')
+      : currentValue.trim();
     if (!trimmedValue) {
       setError(`Please enter ${selectedField.label}.`);
       return;
@@ -439,7 +441,9 @@ const Quotations = () => {
   const saveEdit = () => {
     if (editingIndex === null) return;
     const target = responses[editingIndex];
-    const trimmed = target.type === 'number' ? editingValue : editingValue.trim();
+    const trimmed = target.type === 'number'
+      ? String(editingValue || '').replace(/\D/g, '')
+      : editingValue.trim();
     if (!trimmed) {
       setEditError('Value cannot be empty.');
       return;
@@ -581,9 +585,14 @@ const Quotations = () => {
                       {editingIndex === idx ? (
                         <div className="space-y-2">
                           <input
-                            type={entry.type || 'text'}
+                            type="text"
                             value={editingValue}
-                            onChange={(e) => setEditingValue(e.target.value)}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setEditingValue(entry.type === 'number' ? raw.replace(/\D/g, '') : raw);
+                            }}
+                            inputMode={entry.type === 'number' ? 'numeric' : undefined}
+                            pattern={entry.type === 'number' ? '[0-9]*' : undefined}
                             className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
                             placeholder={`Update ${entry.label}`}
                           />
@@ -670,10 +679,15 @@ const Quotations = () => {
 
                     <div className="w-full md:w-72 lg:w-80">
                       <input
-                        type={selectedField?.type || 'text'}
+                        type="text"
                         value={currentValue}
-                        onChange={(e) => setCurrentValue(e.target.value)}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setCurrentValue(selectedField?.type === 'number' ? raw.replace(/\D/g, '') : raw);
+                        }}
                         onKeyDown={handleKeyPress}
+                        inputMode={selectedField?.type === 'number' ? 'numeric' : undefined}
+                        pattern={selectedField?.type === 'number' ? '[0-9]*' : undefined}
                         className="w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none"
                         placeholder="₹ 00000"
                         disabled={isSaving}
