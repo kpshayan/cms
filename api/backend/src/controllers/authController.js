@@ -299,7 +299,7 @@ exports.signup = asyncHandler(async (req, res) => {
   await account.save();
 
   const sessionId = await createSessionForAccount(account, req);
-  attachAuthCookie(res, sessionId);
+  attachAuthCookie(res, sessionId, req);
   return res.status(201).json({ user: serializeAccount(account) });
 });
 
@@ -341,7 +341,7 @@ exports.login = asyncHandler(async (req, res) => {
   }
 
   const sessionId = await createSessionForAccount(account, req);
-  attachAuthCookie(res, sessionId);
+  attachAuthCookie(res, sessionId, req);
   return res.json({ user: serializeAccount(account) });
 });
 
@@ -411,7 +411,7 @@ exports.getProfile = asyncHandler(async (req, res) => {
     if (req.session?._id) {
       await Session.deleteOne({ _id: req.session._id }).catch(() => {});
     }
-    clearAuthCookie(res);
+    clearAuthCookie(res, req);
     return res.status(403).json({ error: 'This username is no longer allowed.' });
   }
   const roleProfile = resolveProfileFromGroups(account?.username, groups);
@@ -426,7 +426,7 @@ exports.logout = asyncHandler(async (req, res) => {
   if (sessionId) {
     await Session.deleteOne({ sessionIdHash: hashSessionId(sessionId) }).catch(() => {});
   }
-  clearAuthCookie(res);
+  clearAuthCookie(res, req);
   return res.json({ success: true });
 });
 

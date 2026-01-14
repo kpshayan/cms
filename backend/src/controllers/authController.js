@@ -180,7 +180,20 @@ const COOKIE_NAME = 'pf_session';
 const LEGACY_COOKIE_NAME = 'pf_token';
 const COOKIE_MAX_AGE = 1000 * 60 * 60 * 12; // 12 hours
 
-const isProduction = () => process.env.NODE_ENV === 'production';
+const isHttpsRequest = (req) => {
+  const forwardedProto = String(req?.headers?.['x-forwarded-proto'] || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  if (forwardedProto) return forwardedProto === 'https';
+
+  const origin = String(req?.headers?.origin || '');
+  if (origin.startsWith('https://')) return true;
+
+  const host = String(req?.headers?.host || '').toLowerCase();
+  if (!host) return false;
+  return !(host.startsWith('localhost') || host.startsWith('127.0.0.1'));
+};
 
 const hashSessionId = (sessionId) => crypto
   .createHash('sha256')
@@ -204,22 +217,32 @@ const buildCookieOptions = () => ({
   httpOnly: true,
   // For Azure Static Web Apps (different domain) + API (different domain), cookies must be cross-site.
   // Cross-site cookies require SameSite=None and Secure.
-  sameSite: isProduction() ? 'none' : 'lax',
-  secure: isProduction(),
+  sameSite: isHttpsRequest() ? 'none' : 'lax',
+  secure: isHttpsRequest(),
   maxAge: COOKIE_MAX_AGE,
   path: '/',
 });
 
-const attachAuthCookie = (res, token) => {
-  res.cookie(COOKIE_NAME, token, buildCookieOptions());
+const buildCookieOptionsForReq = (req) => {
+  const secure = isHttpsRequest(req);
+  return {
+    httpOnly: true,
+    sameSite: secure ? 'none' : 'lax',
+    secure,
+    maxAge: COOKIE_MAX_AGE,
+    path: '/',
+  };
 };
 
-const clearAuthCookie = (res) => {
+const attachAuthCookie = (res, sessionId, req) => {
+  res.cookie(COOKIE_NAME, sessionId, buildCookieOptionsForReq(req));
+};
+
+const clearAuthCookie = (res, req) => {
   const opts = {
-    httpOnly: true,
-    sameSite: isProduction() ? 'none' : 'lax',
-    secure: isProduction(),
-    path: '/',
+    ...buildCookieOptionsForReq(req),
+    expires: new Date(0),
+    maxAge: 0,
   };
   res.clearCookie(COOKIE_NAME, opts);
   res.clearCookie(LEGACY_COOKIE_NAME, opts);
@@ -300,7 +323,7 @@ exports.signup = asyncHandler(async (req, res) => {
   await account.save();
 
   const sessionId = await createSessionForAccount(account, req);
-  attachAuthCookie(res, sessionId);
+  attachAuthCookie(res, sessionId, req);
   return res.status(201).json({ user: serializeAccount(account) });
 });
 
@@ -342,7 +365,7 @@ exports.login = asyncHandler(async (req, res) => {
   }
 
   const sessionId = await createSessionForAccount(account, req);
-  attachAuthCookie(res, sessionId);
+  attachAuthCookie(res, sessionId, req);
   return res.json({ user: serializeAccount(account) });
 });
 
@@ -412,7 +435,7 @@ exports.getProfile = asyncHandler(async (req, res) => {
     if (req.session?._id) {
       await Session.deleteOne({ _id: req.session._id }).catch(() => {});
     }
-    clearAuthCookie(res);
+    clearAuthCookie(res, req);
     return res.status(403).json({ error: 'This username is no longer allowed.' });
   }
   const roleProfile = resolveProfileFromGroups(account?.username, groups);
@@ -427,7 +450,7 @@ exports.logout = asyncHandler(async (req, res) => {
   if (sessionId) {
     await Session.deleteOne({ sessionIdHash: hashSessionId(sessionId) }).catch(() => {});
   }
-  clearAuthCookie(res);
+  clearAuthCookie(res, req);
   return res.json({ success: true });
 });
 
