@@ -152,6 +152,20 @@ const fetchAsDataUrl = async (url) => {
   });
 };
 
+const fetchFirstAvailableAsDataUrl = async (urls) => {
+  const list = Array.isArray(urls) ? urls.filter(Boolean) : [];
+  let lastError;
+  for (const url of list) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      return await fetchAsDataUrl(url);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('No template URLs provided');
+};
+
 const sanitizeQuotationEntries = (entries) => {
   const list = Array.isArray(entries) ? entries : [];
   return list
@@ -324,12 +338,24 @@ const Quotations = () => {
     const issuedOn = formatIssuedOn(new Date());
 
     // Load page templates (exact look comes from these background images)
-    // You must place them in public/quotation-template/page1.png and page2.png
+    // Place them in public/quotation-template/ (common names supported)
     let page1;
     let page2;
     try {
-      page1 = await fetchAsDataUrl('/quotation-template/page1.png');
-      page2 = await fetchAsDataUrl('/quotation-template/page2.png');
+      page1 = await fetchFirstAvailableAsDataUrl([
+        '/quotation-template/page1.png',
+        '/quotation-template/page1.jpg',
+        '/quotation-template/page1.jpeg',
+        '/quotation-template/page1.png.jpg',
+        '/quotation-template/page1.png.jpeg',
+      ]);
+      page2 = await fetchFirstAvailableAsDataUrl([
+        '/quotation-template/page2.png',
+        '/quotation-template/page2.jpg',
+        '/quotation-template/page2.jpeg',
+        '/quotation-template/page2.png.jpg',
+        '/quotation-template/page2.png.jpeg',
+      ]);
     } catch {
       // Fallback: still generate a basic PDF if template images are missing
       doc.setFontSize(18);
