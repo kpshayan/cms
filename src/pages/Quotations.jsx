@@ -137,7 +137,19 @@ const formatIssuedOn = (date = new Date()) => {
   ];
   const month = months[d.getMonth()] || '';
   const yyyy = d.getFullYear();
-  return `${dd}${month}'${yyyy}`;
+  // Matches the template style: 15'January'2026
+  return `${dd}'${month}'${yyyy}`;
+};
+
+const formatQuoteNo = (raw) => {
+  const clean = String(raw || '').trim();
+  if (!clean) return '';
+  // If backend stores a plain sequence number, render as MSBQYY### (example: MSBQ26001)
+  if (/^\d+$/.test(clean)) {
+    const yy = String(new Date().getFullYear()).slice(-2);
+    return `MSBQ${yy}${clean.padStart(3, '0')}`;
+  }
+  return clean;
 };
 
 const fetchAsDataUrl = async (url) => {
@@ -334,7 +346,7 @@ const Quotations = () => {
       ? (project?.quotationDetails || detailsDraft)
       : detailsDraft;
 
-    const quoteNo = String(details?.quoteNo || '').trim();
+    const quoteNo = formatQuoteNo(details?.quoteNo);
     const issuedOn = formatIssuedOn(new Date());
 
     // Load page templates (exact look comes from these background images)
@@ -366,86 +378,111 @@ const Quotations = () => {
       return doc.output('blob');
     }
 
-    // Page 1 background
-    doc.addImage(page1, 'PNG', 0, 0, 210, 297);
+    // Page 1 background (template)
+    doc.addImage(page1, 'JPEG', 0, 0, 210, 297);
 
-    // Overlay dynamic header values (coordinates tuned for A4 template)
-    // Quote No (left side line)
+    // Wipe any sample/placeholder text baked into the template image.
+    // These rectangles are intentionally a bit generous.
+    doc.setFillColor(255, 255, 255);
+    // Quote No value area (left)
+    doc.rect(30, 81, 85, 12, 'F');
+    // Issued On value area (right)
+    doc.rect(142, 62, 60, 10, 'F');
+    // Issued To values area (right block)
+    doc.rect(150, 73, 55, 42, 'F');
+    // Table body area (rows)
+    doc.rect(18, 126, 190, 35, 'F');
+    // Total value area
+    doc.rect(150, 163, 55, 10, 'F');
+    // Total words area
+    doc.rect(30, 173, 170, 9, 'F');
+
+    // Overlay dynamic header values (coordinates tuned for this template)
+    // Quote No (left side)
     if (quoteNo) {
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(11);
-      doc.text(quoteNo, 44, 70);
+      doc.setTextColor(85, 85, 85);
+      doc.setFontSize(12);
+      doc.text(quoteNo, 58, 89);
     }
 
     // Issued on (top-right)
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(90, 90, 90);
-    doc.setFontSize(9);
-    doc.text(issuedOn, 166, 63);
+    doc.setFontSize(10);
+    doc.text(issuedOn, 176, 69, { align: 'right' });
 
-    // Issued to (right box)
+    // Issued to (right box): template already prints labels, so we print values only.
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(90, 90, 90);
-    doc.setFontSize(9);
-    const rightX = 148;
-    let rightY = 78;
-    const rightLine = (label, value) => {
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(10);
+    const rightX = 170;
+    let rightY = 79.5;
+    const rightValue = (value) => {
       const v = String(value || '').trim();
-      doc.text(`${label}: ${v}`, rightX, rightY);
-      rightY += 5.2;
+      doc.text(v || '-', rightX, rightY);
+      rightY += 6;
     };
-    rightLine('Name', details?.name);
-    rightLine('Production', details?.production);
-    rightLine('Project', details?.project);
-    rightLine('Type', details?.type);
-    rightLine('Producer', details?.producer);
-    rightLine('Contact', details?.contact);
+    rightValue(details?.name);
+    rightValue(details?.production);
+    rightValue(details?.project);
+    rightValue(details?.type);
+    rightValue(details?.producer);
+    rightValue(details?.contact);
 
     // Table rows (Description | Duration | Amount)
     const rows = Array.isArray(entries) ? entries : [];
-    const startY = 129;
-    const rowH = 8;
-    const descX = 24;
-    const durX = 112;
-    const amtX = 190;
+    const startY = 135;
+    const rowH = 10;
+    const descX = 25;
+    const durX = 118;
+    const amtX = 194;
     let y = startY;
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(60, 60, 60);
-    doc.setFontSize(9);
+    doc.setFontSize(10);
 
     const amounts = rows.map((r) => Number(digitsOnly(r?.value))).filter((n) => Number.isFinite(n));
     const total = amounts.reduce((a, b) => a + b, 0);
 
-    rows.slice(0, 6).forEach((entry) => {
+    const descMaxWidth = 75;
+    const durMaxWidth = 75;
+    rows.slice(0, 3).forEach((entry) => {
       const desc = String(entry?.label || '').trim();
       const duration = String(entry?.duration || '').trim();
       const amt = digitsOnly(entry?.value);
-      doc.text(desc, descX, y);
-      doc.text(duration || '-', durX, y, { align: 'center' });
+
+      const descLines = doc.splitTextToSize(desc || '-', descMaxWidth);
+      const durLines = doc.splitTextToSize(duration || '-', durMaxWidth);
+      const lines = Math.max(descLines.length, durLines.length);
+      const lineH = 4.2;
+
+      doc.text(descLines, descX, y);
+      doc.text(durLines, durX, y, { align: 'center' });
       doc.text(`${formatIndianNumber(amt)}/-`, amtX, y, { align: 'right' });
-      y += rowH;
+
+      y += Math.max(rowH, lines * lineH);
     });
 
     // Total row
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(60, 60, 60);
-    doc.setFontSize(10);
-    doc.text(`${formatIndianNumber(total)}/-`, amtX, 176, { align: 'right' });
+    doc.setFontSize(11);
+    doc.text(`${formatIndianNumber(total)}/-`, amtX, 170, { align: 'right' });
 
     // Total in words line
     const words = numberToWordsIndian(total);
     if (words) {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
+      doc.setFontSize(10);
       doc.setTextColor(60, 60, 60);
-      doc.text(`${words} Only`, 105, 186, { align: 'center' });
+      doc.text(`${words} Only`, 105, 179.5, { align: 'center' });
     }
 
     // Page 2 background (Terms)
     doc.addPage();
-    doc.addImage(page2, 'PNG', 0, 0, 210, 297);
+    doc.addImage(page2, 'JPEG', 0, 0, 210, 297);
 
     return doc.output('blob');
   };
@@ -470,7 +507,7 @@ const Quotations = () => {
     setSubmitError('');
     try {
       const pdfBlob = await buildPdfBlob(entries);
-      const quoteNo = String(project?.quotationDetails?.quoteNo || detailsDraft.quoteNo || '').trim();
+      const quoteNo = formatQuoteNo(project?.quotationDetails?.quoteNo || detailsDraft.quoteNo || '');
       const baseName = quoteNo || (project?.key || 'PROJECT').toUpperCase();
       const pdfName = `${baseName}-Quotation.pdf`;
       const pdfBase64 = await blobToBase64(pdfBlob);
