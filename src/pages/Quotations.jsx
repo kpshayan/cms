@@ -76,6 +76,7 @@ const sanitizeQuotationEntries = (entries) => {
     .map((entry) => ({
       ...entry,
       label: FIELD_SEQUENCE_LABEL_MAP.get(entry.key) || entry.label,
+      duration: typeof entry.duration === 'string' ? entry.duration : '',
     }));
 };
 
@@ -93,10 +94,12 @@ const Quotations = () => {
   const projectId = project?._id || project?.id || id;
   const [selectedFieldKey, setSelectedFieldKey] = useState('');
   const [currentValue, setCurrentValue] = useState('');
+  const [currentDuration, setCurrentDuration] = useState('');
   const [responses, setResponses] = useState([]);
   const [error, setError] = useState('');
   const [editingIndex, setEditingIndex] = useState(null);
   const [editingValue, setEditingValue] = useState('');
+  const [editingDuration, setEditingDuration] = useState('');
   const [editError, setEditError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -147,6 +150,9 @@ const Quotations = () => {
     if (typeof draft.currentValue === 'string') {
       setCurrentValue(draft.currentValue);
     }
+    if (typeof draft.currentDuration === 'string') {
+      setCurrentDuration(draft.currentDuration);
+    }
 
     draftRestoredRef.current = true;
   }, [projectId]);
@@ -168,10 +174,11 @@ const Quotations = () => {
       responses,
       selectedFieldKey,
       currentValue,
+      currentDuration,
       savedAt: new Date().toISOString(),
     };
     writeDraft(projectId, payload);
-  }, [projectId, responses, selectedFieldKey, currentValue]);
+  }, [projectId, responses, selectedFieldKey, currentValue, currentDuration]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -230,7 +237,10 @@ const Quotations = () => {
     }
     let y = 44;
     entries.forEach((entry, idx) => {
-      const lines = doc.splitTextToSize(`${entry.label}: ${entry.value}`, 170);
+      const durationSuffix = String(entry.duration || '').trim()
+        ? ` (Duration: ${String(entry.duration).trim()})`
+        : '';
+      const lines = doc.splitTextToSize(`${entry.label}: ${entry.value}${durationSuffix}`, 170);
       doc.text(lines, 20, y);
       y += lines.length * 8;
       if (y > 270 && idx !== entries.length - 1) {
@@ -328,9 +338,12 @@ const Quotations = () => {
       return;
     }
 
-    const nextEntries = [...responses, { ...selectedField, value: trimmedValue }];
+    const trimmedDuration = currentDuration.trim();
+
+    const nextEntries = [...responses, { ...selectedField, value: trimmedValue, duration: trimmedDuration }];
     setResponses(nextEntries);
     setCurrentValue('');
+    setCurrentDuration('');
     setSelectedFieldKey('');
     setError('');
     setSubmitError('');
@@ -388,17 +401,20 @@ const Quotations = () => {
   const startEdit = (index) => {
     setEditingIndex(index);
     setEditingValue(responses[index].value);
+    setEditingDuration(responses[index].duration || '');
     setEditError('');
   };
 
   const cancelEdit = () => {
     setEditingIndex(null);
     setEditingValue('');
+    setEditingDuration('');
     setEditError('');
   };
 
   const clearEditValue = () => {
     setEditingValue('');
+    setEditingDuration('');
     setEditError('');
   };
 
@@ -422,8 +438,9 @@ const Quotations = () => {
       setEditError('Value cannot be empty.');
       return;
     }
+    const nextDuration = String(editingDuration || '').trim();
     setResponses((prev) => prev.map((entry, idx) => (
-      idx === editingIndex ? { ...entry, value: trimmed } : entry
+      idx === editingIndex ? { ...entry, value: trimmed, duration: nextDuration } : entry
     )));
     cancelEdit();
   };
@@ -546,17 +563,33 @@ const Quotations = () => {
 
                     <div className="mt-2">
                       {editingIndex === idx ? (
-                        <input
-                          type={entry.type || 'text'}
-                          value={editingValue}
-                          onChange={(e) => setEditingValue(e.target.value)}
-                          className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
-                          placeholder={`Update ${entry.label}`}
-                        />
+                        <div className="space-y-2">
+                          <input
+                            type={entry.type || 'text'}
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
+                            placeholder={`Update ${entry.label}`}
+                          />
+                          <input
+                            type="text"
+                            value={editingDuration}
+                            onChange={(e) => setEditingDuration(e.target.value)}
+                            className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
+                            placeholder="Enter duration"
+                          />
+                        </div>
                       ) : (
-                        <p className="text-sm font-semibold text-jira-gray dark:text-white break-words">
-                          {entry.value}
-                        </p>
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-jira-gray dark:text-white break-words">
+                            {entry.value}
+                          </p>
+                          {String(entry.duration || '').trim() && (
+                            <p className="text-xs text-gray-500 dark:text-[var(--text-secondary)]">
+                              Duration: {String(entry.duration).trim()}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
 
@@ -627,6 +660,17 @@ const Quotations = () => {
                         onKeyDown={handleKeyPress}
                         className="w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none"
                         placeholder="₹ 00000"
+                        disabled={isSaving}
+                      />
+                    </div>
+
+                    <div className="w-full md:w-64 lg:w-72">
+                      <input
+                        type="text"
+                        value={currentDuration}
+                        onChange={(e) => setCurrentDuration(e.target.value)}
+                        className="w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none"
+                        placeholder="Enter duration"
                         disabled={isSaving}
                       />
                     </div>

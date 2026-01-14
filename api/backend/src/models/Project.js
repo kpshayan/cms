@@ -4,6 +4,7 @@ const quotationEntrySchema = new mongoose.Schema({
   key: { type: String, trim: true },
   label: { type: String, trim: true },
   value: { type: String, trim: true },
+  duration: { type: String, trim: true },
   type: { type: String, trim: true },
 }, { _id: false });
 
