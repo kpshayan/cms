@@ -324,16 +324,16 @@ const Summary = () => {
   return (
     <div className="p-8 bg-jira-bg min-h-screen">
       {/* Header with Add Task Button */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center mb-6">
+        <div className="min-w-0">
           <h2 className="text-2xl font-bold text-jira-gray">Project Overview</h2>
-          <p className="text-gray-600">Track your project progress and team activity</p>
         </div>
-        <div className="flex items-center gap-4">
+
+        <div className="flex justify-center">
           {hasQuotationDetails && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3">
-              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Details</p>
-              <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-xs text-gray-600">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 w-full max-w-md">
+              <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Details</p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-gray-700">
                 <div className="truncate"><span className="font-semibold">Name:</span> {quotationDetails.name}</div>
                 <div className="truncate"><span className="font-semibold">Type:</span> {quotationDetails.type}</div>
                 <div className="truncate"><span className="font-semibold">Production:</span> {quotationDetails.production}</div>
@@ -343,7 +343,9 @@ const Summary = () => {
               </div>
             </div>
           )}
+        </div>
 
+        <div className="flex justify-start lg:justify-end">
           {canAddTasks && (
             <button
               onClick={() => setShowTaskModal(true)}
