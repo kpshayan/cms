@@ -14,10 +14,21 @@ module.exports = async function bootstrap() {
     if (!process.env.MONGODB_URI) {
       throw new Error('MONGODB_URI is missing in the deployed environment. Add it in Static Web Apps -> Environment variables.');
     }
-    if (mongoose.connection.readyState !== 1) {
-      await connectDatabase();
+    try {
+      if (mongoose.connection.readyState !== 1) {
+        await connectDatabase();
+      }
+      await ensureAccessGroups();
+    } catch (err) {
+      const message = err?.message || String(err);
+      const wrapped = new Error(
+        `API bootstrap failed (database/access groups). ${message} `
+        + 'If this happens only in Azure, check MongoDB Atlas Network Access / IP allowlist and that the connection string is valid.'
+      );
+      wrapped.status = 500;
+      wrapped.code = err?.code;
+      throw wrapped;
     }
-    await ensureAccessGroups();
   })();
 
   return initPromise;

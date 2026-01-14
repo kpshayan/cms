@@ -31,6 +31,38 @@ module.exports = async function (context, req) {
     }
   };
 
+  const checkDb = (() => {
+    const raw = req.query?.checkDb ?? req.query?.db ?? req.query?.checkdb;
+    if (raw == null) return false;
+    const normalized = String(raw).trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes';
+  })();
+
+  const db = {
+    checkRequested: checkDb,
+    readyState: null,
+    host: null,
+    error: null,
+  };
+
+  if (checkDb) {
+    try {
+      // eslint-disable-next-line global-require
+      const mongoose = require('mongoose');
+      // eslint-disable-next-line global-require
+      const bootstrap = require('../shared/bootstrap');
+      await bootstrap();
+      db.readyState = mongoose.connection.readyState;
+      db.host = mongoose.connection.host || null;
+    } catch (err) {
+      db.error = {
+        name: err?.name,
+        code: err?.code,
+        message: err?.message,
+      };
+    }
+  }
+
   const payload = {
     node: process.version,
     env: {
@@ -39,6 +71,7 @@ module.exports = async function (context, req) {
       hasJWT_SECRET: Boolean(process.env.JWT_SECRET),
       hasADMIN1_USERNAMES: Boolean(process.env.ADMIN1_USERNAMES),
     },
+    db,
     modules: {
       bcryptjs: tryRequire('bcryptjs'),
       jsonwebtoken: tryRequire('jsonwebtoken'),
