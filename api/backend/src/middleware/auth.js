@@ -1,6 +1,13 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const Account = require('../models/Account');
 const asyncHandler = require('../utils/asyncHandler');
+
+const jwtSecretFingerprint = () => (
+  process.env.JWT_SECRET
+    ? crypto.createHash('sha256').update(String(process.env.JWT_SECRET)).digest('hex').slice(0, 12)
+    : null
+);
 
 const authenticate = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization || '';
@@ -30,6 +37,10 @@ const authenticate = asyncHandler(async (req, res, next) => {
       reason: err?.name || 'UnknownError',
       // Keep this minimal; helpful for debugging signature issues.
       message: err?.message || undefined,
+      meta: {
+        tokenLength: String(token || '').length,
+        jwtSecretFingerprint: jwtSecretFingerprint(),
+      },
     });
   }
 });
