@@ -17,10 +17,10 @@ const Dashboard = () => {
   const isAdminOne = user?.role === 'FULL_ACCESS';
   
   return (
-    <div className="flex min-h-screen bg-jira-bg dark:bg-[var(--bg-body)]">
+    <div className="flex h-screen overflow-hidden bg-jira-bg dark:bg-[var(--bg-body)]">
       <Sidebar />
       
-      <div className={`flex-1 transition-all duration-500 ${collapsed ? 'ml-16' : 'ml-64'}`}>
+      <div className={`flex-1 min-h-0 overflow-y-auto transition-all duration-500 ${collapsed ? 'ml-16' : 'ml-64'}`}>
         <Routes>
           {/* Dashboard Home */}
           <Route index element={<ProjectsOverview />} />

@@ -25,7 +25,7 @@ const Sidebar = () => {
     <div 
       className={`${
         collapsed ? 'w-16' : 'w-64'
-      } bg-gradient-to-b from-white via-blue-50/20 to-white dark:from-[#060c1b] dark:via-[#050815] dark:to-[#04060d] border-r-2 border-blue-100 dark:border-white/5 h-screen fixed left-0 top-0 transition-all duration-500 ease-in-out flex flex-col shadow-xl dark:shadow-[0_25px_60px_rgba(2,5,16,0.8)] z-50`}
+      } bg-gradient-to-b from-white via-blue-50/20 to-white dark:from-[#060c1b] dark:via-[#050815] dark:to-[#04060d] border-r-2 border-blue-100 dark:border-white/5 h-screen min-h-0 fixed left-0 top-0 transition-all duration-500 ease-in-out flex flex-col shadow-xl dark:shadow-[0_25px_60px_rgba(2,5,16,0.8)] z-50`}
     >
       {/* Header */}
       <div className="h-16 border-b-2 border-blue-100 dark:border-white/5 flex items-center justify-between px-4 bg-gradient-to-r from-jira-blue/10 to-transparent dark:from-white/5 dark:to-transparent">
@@ -57,7 +57,7 @@ const Sidebar = () => {
       </div>
 
       {/* Projects Section */}
-      <div className="flex-1 overflow-y-auto py-4">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-4">
         <nav className="space-y-1 px-2">
           {/* Dashboard Home Link */}
           <Link

@@ -2,15 +2,19 @@ import { X } from 'lucide-react';
 import { useEffect } from 'react';
 
 const Modal = ({ isOpen, onClose, title, children, footer }) => {
-  if (!isOpen) return null;
-
   useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, []);
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   return (
     <>
