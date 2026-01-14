@@ -5,6 +5,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
+      "dataType": "string",
       "methods": ["get", "post", "put", "patch", "delete", "options"],
       "route": "tasks/{*path}"
     },
