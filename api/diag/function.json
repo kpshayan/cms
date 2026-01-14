@@ -5,8 +5,9 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["get", "options"],
-      "route": "diag"
+      "dataType": "string",
+      "methods": ["get", "post", "options"],
+      "route": "diag/{*path}"
     },
     {
       "type": "http",

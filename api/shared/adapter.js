@@ -1,24 +1,42 @@
 const { parseCookies, serializeCookie } = require('./cookies');
 
 const parseBody = (req) => {
-  const body = req.body ?? req.rawBody;
-  if (body == null) return undefined;
-  if (typeof body === 'object') return body;
-  if (Buffer.isBuffer(body)) {
-    const text = body.toString('utf8');
+  const toTextIfPossible = (value) => {
+    if (value == null) return null;
+    if (typeof value === 'string') return value;
+    if (Buffer.isBuffer(value)) return value.toString('utf8');
+    // Azure sometimes provides Uint8Array
+    if (value instanceof Uint8Array) return Buffer.from(value).toString('utf8');
+    return null;
+  };
+
+  const tryParseJson = (text) => {
     try {
       return JSON.parse(text);
     } catch {
       return text;
     }
+  };
+
+  // Prefer rawBody if present (SWA/Functions sometimes sets req.body to {} even when rawBody has data)
+  const rawText = toTextIfPossible(req.rawBody);
+  if (rawText != null && rawText !== '') {
+    return tryParseJson(rawText);
   }
-  if (typeof body === 'string') {
-    try {
-      return JSON.parse(body);
-    } catch {
-      return body;
-    }
+
+  const bodyText = toTextIfPossible(req.body);
+  if (bodyText != null && bodyText !== '') {
+    return tryParseJson(bodyText);
   }
+
+  const body = req.body;
+  if (body == null) return undefined;
+
+  // If body is an empty plain object, treat it as missing.
+  if (typeof body === 'object' && body.constructor === Object && Object.keys(body).length === 0) {
+    return undefined;
+  }
+
   return body;
 };
 

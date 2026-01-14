@@ -15,6 +15,22 @@ module.exports = async function (context, req) {
     return;
   }
 
+  const preview = (value, max = 800) => {
+    if (value == null) return null;
+    try {
+      const text = typeof value === 'string'
+        ? value
+        : Buffer.isBuffer(value)
+          ? value.toString('utf8')
+          : value instanceof Uint8Array
+            ? Buffer.from(value).toString('utf8')
+            : JSON.stringify(value);
+      return text.length > max ? `${text.slice(0, max)}...` : text;
+    } catch {
+      return null;
+    }
+  };
+
   const tryRequire = (name) => {
     try {
       // eslint-disable-next-line global-require, import/no-dynamic-require
@@ -45,6 +61,21 @@ module.exports = async function (context, req) {
       mongoose: tryRequire('mongoose'),
     },
   };
+
+  if (method === 'POST') {
+    const headers = req.headers || {};
+    payload.request = {
+      method,
+      headers: {
+        'content-type': headers['content-type'] || headers['Content-Type'] || null,
+        'content-length': headers['content-length'] || headers['Content-Length'] || null,
+      },
+      bodyType: req.body == null ? null : typeof req.body,
+      rawBodyType: req.rawBody == null ? null : typeof req.rawBody,
+      bodyPreview: preview(req.body),
+      rawBodyPreview: preview(req.rawBody),
+    };
+  }
 
   context.res = {
     status: 200,
