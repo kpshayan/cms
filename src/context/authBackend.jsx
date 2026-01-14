@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { authAPI } from '../services/api';
+import { authAPI, setAuthToken, clearAuthToken } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -42,6 +42,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       const data = await authAPI.login({ username, password });
+      if (data?.token) setAuthToken(data.token);
       setUser(data.user);
       await loadExecutors();
       return true;
@@ -55,6 +56,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       const data = await authAPI.signup({ username, password });
+      if (data?.token) setAuthToken(data.token);
       setUser(data.user);
       await loadExecutors();
       return true;
@@ -68,6 +70,7 @@ export const AuthProvider = ({ children }) => {
     authAPI.logout().catch((err) => {
       console.warn('Failed to call logout endpoint', err);
     });
+    clearAuthToken();
     setUser(null);
     setExecutors([]);
     setError(null);

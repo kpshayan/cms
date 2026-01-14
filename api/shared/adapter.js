@@ -1,9 +1,17 @@
 const { parseCookies, serializeCookie } = require('./cookies');
 
 const parseBody = (req) => {
-  const body = req.body;
+  const body = req.body ?? req.rawBody;
   if (body == null) return undefined;
   if (typeof body === 'object') return body;
+  if (Buffer.isBuffer(body)) {
+    const text = body.toString('utf8');
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
   if (typeof body === 'string') {
     try {
       return JSON.parse(body);

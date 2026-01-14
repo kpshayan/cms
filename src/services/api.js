@@ -1,8 +1,37 @@
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+const TOKEN_STORAGE_KEY = 'pf_token';
+
+export const getAuthToken = () => {
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const setAuthToken = (token) => {
+  try {
+    if (!token) return;
+    localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  } catch {
+    // ignore storage errors
+  }
+};
+
+export const clearAuthToken = () => {
+  try {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+};
+
 const apiCall = async (url, options = {}) => {
+  const token = getAuthToken();
   const headers = {
     'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
@@ -13,8 +42,13 @@ const apiCall = async (url, options = {}) => {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || `API Error: ${response.statusText}`);
+    let error;
+    try {
+      error = await response.json();
+    } catch {
+      error = null;
+    }
+    throw new Error(error?.error || `API Error: ${response.statusText}`);
   }
 
   return response.json();
