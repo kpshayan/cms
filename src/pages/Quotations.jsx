@@ -494,7 +494,15 @@ const Quotations = () => {
     setDetailsError('');
     setSubmitError('');
 
-    const missing = DETAILS_FIELDS.filter((field) => !String(detailsDraft[field.key] || '').trim());
+    const quoteNo = String(detailsDraft.quoteNo || '').trim();
+    if (!quoteNo) {
+      setDetailsError('Quotation number is not generated yet. Please refresh and try again.');
+      return;
+    }
+
+    const missing = DETAILS_FIELDS
+      .filter((field) => field.key !== 'quoteNo')
+      .filter((field) => !String(detailsDraft[field.key] || '').trim());
     if (missing.length) {
       setDetailsError('Please fill all details fields before finalizing.');
       return;
@@ -640,6 +648,9 @@ const Quotations = () => {
                         value={detailsDraft[field.key]}
                         onChange={(e) => {
                           const raw = e.target.value;
+                          if (field.key === 'quoteNo') {
+                            return;
+                          }
                           const next = field.key === 'contact'
                             ? raw.replace(/\D/g, '').slice(0, 10)
                             : raw;
@@ -650,8 +661,8 @@ const Quotations = () => {
                         pattern={field.key === 'contact' ? '[0-9]*' : undefined}
                         maxLength={field.key === 'contact' ? 10 : undefined}
                         className="mt-1 w-full h-11 px-4 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
-                        placeholder={field.key === 'contact' ? 'Enter mobile number' : field.label}
-                        disabled={isSavingDetails}
+                        placeholder={field.key === 'quoteNo' ? 'Auto generated' : (field.key === 'contact' ? 'Enter mobile number' : field.label)}
+                        disabled={isSavingDetails || field.key === 'quoteNo'}
                       />
                     ) : (
                       <p className="mt-1 text-sm font-semibold text-jira-gray dark:text-white break-words">

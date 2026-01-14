@@ -1,10 +1,30 @@
 const Project = require('../models/Project');
 const Task = require('../models/Task');
 const TeamMember = require('../models/TeamMember');
+const Counter = require('../models/Counter');
 const asyncHandler = require('../utils/asyncHandler');
 const { normalizePhoneDigits, isValidMobile10 } = require('../utils/phone');
 
 const normalize = (value) => String(value || '').trim().toLowerCase();
+
+const getNextQuotationNumber = async () => {
+  const counter = await Counter.findOneAndUpdate(
+    { key: 'quotation' },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  return String(counter.seq);
+};
+
+const ensureProjectQuotationNumber = async (project) => {
+  if (!project) return project;
+  project.quotationDetails = project.quotationDetails || {};
+  const current = String(project.quotationDetails.quoteNo || '').trim();
+  if (current) return project;
+  project.quotationDetails.quoteNo = await getNextQuotationNumber();
+  await project.save();
+  return project;
+};
 
 const ensureProjectCommentAccess = (req) => {
   const role = req.user?.role;
@@ -100,6 +120,7 @@ const serializeProject = (project) => {
 
 exports.listProjects = asyncHandler(async (req, res) => {
   const projects = await Project.find().populate('team');
+  await Promise.all(projects.map((project) => ensureProjectQuotationNumber(project)));
   return res.json(projects.map(serializeProject));
 });
 
@@ -108,6 +129,7 @@ exports.getProject = asyncHandler(async (req, res) => {
   if (!project) {
     return res.status(404).json({ error: 'Project not found.' });
   }
+  await ensureProjectQuotationNumber(project);
   return res.json(serializeProject(project));
 });
 
@@ -124,6 +146,7 @@ exports.createProject = asyncHandler(async (req, res) => {
   }
 
   const project = await Project.create(payload);
+  await ensureProjectQuotationNumber(project);
   const hydrated = await buildProjectPayload(project);
   return res.status(201).json(serializeProject(hydrated));
 });
@@ -148,7 +171,8 @@ exports.updateProject = asyncHandler(async (req, res) => {
       project.quotationDetails = undefined;
     } else if (typeof next === 'object') {
       project.quotationDetails = project.quotationDetails || {};
-      const allowedKeys = ['quoteNo', 'name', 'production', 'project', 'type', 'producer', 'contact'];
+      // quoteNo is system-generated; ignore any client-provided value
+      const allowedKeys = ['name', 'production', 'project', 'type', 'producer', 'contact'];
 
       if (next.contact !== undefined) {
         const normalized = normalizePhoneDigits(next.contact);
@@ -169,6 +193,10 @@ exports.updateProject = asyncHandler(async (req, res) => {
 
   if (req.body.quotationDetailsFinalized !== undefined) {
     project.quotationDetailsFinalized = Boolean(req.body.quotationDetailsFinalized);
+  }
+
+  if (touchingQuotationDetails) {
+    await ensureProjectQuotationNumber(project);
   }
 
   if (touchingQuotationDetails && project.quotationDetailsFinalized) {
