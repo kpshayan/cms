@@ -202,17 +202,29 @@ const createSessionForAccount = async (account, req) => {
 
 const buildCookieOptions = () => ({
   httpOnly: true,
-  sameSite: isProduction() ? 'none' : 'lax',
+  const crossSite = isCrossSiteRequest(req);
   secure: isProduction(),
   maxAge: COOKIE_MAX_AGE,
-  path: '/',
-});
-
+    // Prefer Lax for same-site (better mobile compatibility).
+    // Use None only when the request is cross-site and HTTPS (required by browsers).
+    sameSite: crossSite && secure ? 'none' : 'lax',
 const attachAuthCookie = (res, token) => {
   res.cookie(COOKIE_NAME, token, buildCookieOptions());
 };
 
 const clearAuthCookie = (res) => {
+
+const isCrossSiteRequest = (req) => {
+  const origin = String(req?.headers?.origin || '').trim();
+  const host = String(req?.headers?.host || '').trim();
+  if (!origin || !host) return false;
+  try {
+    const url = new URL(origin);
+    return url.host !== host;
+  } catch {
+    return false;
+  }
+};
   const opts = {
     httpOnly: true,
     sameSite: isProduction() ? 'none' : 'lax',

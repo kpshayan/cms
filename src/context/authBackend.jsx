@@ -48,7 +48,12 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       const data = await authAPI.login({ username, password });
-      setUser(data.user);
+      try {
+        const me = await authAPI.getMe();
+        setUser(me.user);
+      } catch {
+        throw new Error('Sign-in failed: your browser is blocking session cookies. Open in Chrome/Safari (not an in-app browser) and allow cookies.');
+      }
       await loadExecutors();
       return true;
     } catch (err) {
@@ -60,8 +65,13 @@ export const AuthProvider = ({ children }) => {
   const signup = async (username, password) => {
     try {
       setError(null);
-      const data = await authAPI.signup({ username, password });
-      setUser(data.user);
+      await authAPI.signup({ username, password });
+      try {
+        const me = await authAPI.getMe();
+        setUser(me.user);
+      } catch {
+        throw new Error('Sign-up failed: your browser is blocking session cookies. Open in Chrome/Safari (not an in-app browser) and allow cookies.');
+      }
       await loadExecutors();
       return true;
     } catch (err) {

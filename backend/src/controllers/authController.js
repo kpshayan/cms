@@ -195,6 +195,18 @@ const isHttpsRequest = (req) => {
   return !(host.startsWith('localhost') || host.startsWith('127.0.0.1'));
 };
 
+const isCrossSiteRequest = (req) => {
+  const origin = String(req?.headers?.origin || '').trim();
+  const host = String(req?.headers?.host || '').trim();
+  if (!origin || !host) return false;
+  try {
+    const url = new URL(origin);
+    return url.host !== host;
+  } catch {
+    return false;
+  }
+};
+
 const hashSessionId = (sessionId) => crypto
   .createHash('sha256')
   .update(String(sessionId || ''))
@@ -213,21 +225,12 @@ const createSessionForAccount = async (account, req) => {
   return sessionId;
 };
 
-const buildCookieOptions = () => ({
-  httpOnly: true,
-  // For Azure Static Web Apps (different domain) + API (different domain), cookies must be cross-site.
-  // Cross-site cookies require SameSite=None and Secure.
-  sameSite: isHttpsRequest() ? 'none' : 'lax',
-  secure: isHttpsRequest(),
-  maxAge: COOKIE_MAX_AGE,
-  path: '/',
-});
-
 const buildCookieOptionsForReq = (req) => {
   const secure = isHttpsRequest(req);
+  const crossSite = isCrossSiteRequest(req);
   return {
     httpOnly: true,
-    sameSite: secure ? 'none' : 'lax',
+    sameSite: crossSite && secure ? 'none' : 'lax',
     secure,
     maxAge: COOKIE_MAX_AGE,
     path: '/',
