@@ -1,4 +1,5 @@
 module.exports = async function (context, req) {
+  const crypto = require('crypto');
   const method = String(req.method || '').toUpperCase();
   if (method === 'OPTIONS') {
     context.res = {
@@ -53,6 +54,10 @@ module.exports = async function (context, req) {
       NODE_ENV: process.env.NODE_ENV || null,
       hasMONGODB_URI: Boolean(process.env.MONGODB_URI),
       hasJWT_SECRET: Boolean(process.env.JWT_SECRET),
+      jwtSecretLength: process.env.JWT_SECRET ? String(process.env.JWT_SECRET).length : 0,
+      jwtSecretFingerprint: process.env.JWT_SECRET
+        ? crypto.createHash('sha256').update(String(process.env.JWT_SECRET)).digest('hex').slice(0, 12)
+        : null,
       hasADMIN1_USERNAMES: Boolean(process.env.ADMIN1_USERNAMES),
     },
     modules: {

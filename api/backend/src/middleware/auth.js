@@ -25,7 +25,12 @@ const authenticate = asyncHandler(async (req, res, next) => {
     req.user = account;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return res.status(401).json({
+      error: 'Invalid or expired token',
+      reason: err?.name || 'UnknownError',
+      // Keep this minimal; helpful for debugging signature issues.
+      message: err?.message || undefined,
+    });
   }
 });
 
