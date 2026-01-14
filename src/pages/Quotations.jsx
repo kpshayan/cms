@@ -69,6 +69,8 @@ const DETAILS_FIELDS = [
 const FIELD_SEQUENCE_KEY_SET = new Set(FIELD_SEQUENCE.map((field) => field.key));
 const FIELD_SEQUENCE_LABEL_MAP = new Map(FIELD_SEQUENCE.map((field) => [field.key, field.label]));
 
+const digitsOnly = (value) => String(value || '').replace(/\D/g, '');
+
 const sanitizeQuotationEntries = (entries) => {
   const list = Array.isArray(entries) ? entries : [];
   return list
@@ -76,6 +78,7 @@ const sanitizeQuotationEntries = (entries) => {
     .map((entry) => ({
       ...entry,
       label: FIELD_SEQUENCE_LABEL_MAP.get(entry.key) || entry.label,
+      value: digitsOnly(entry.value),
       duration: typeof entry.duration === 'string' ? entry.duration : '',
     }));
 };
@@ -148,7 +151,7 @@ const Quotations = () => {
       setResponses(sanitizeQuotationEntries(draftResponses));
     }
     if (typeof draft.currentValue === 'string') {
-      setCurrentValue(draft.currentValue);
+      setCurrentValue(digitsOnly(draft.currentValue));
     }
     if (typeof draft.currentDuration === 'string') {
       setCurrentDuration(draft.currentDuration);
@@ -332,9 +335,7 @@ const Quotations = () => {
       return;
     }
 
-    const trimmedValue = selectedField.type === 'number'
-      ? String(currentValue || '').replace(/\D/g, '')
-      : currentValue.trim();
+    const trimmedValue = digitsOnly(currentValue);
     if (!trimmedValue) {
       setError(`Please enter ${selectedField.label}.`);
       return;
@@ -408,7 +409,7 @@ const Quotations = () => {
 
   const startEdit = (index) => {
     setEditingIndex(index);
-    setEditingValue(responses[index].value);
+    setEditingValue(digitsOnly(responses[index].value));
     setEditingDuration(responses[index].duration || '');
     setEditError('');
   };
@@ -440,10 +441,7 @@ const Quotations = () => {
 
   const saveEdit = () => {
     if (editingIndex === null) return;
-    const target = responses[editingIndex];
-    const trimmed = target.type === 'number'
-      ? String(editingValue || '').replace(/\D/g, '')
-      : editingValue.trim();
+    const trimmed = digitsOnly(editingValue);
     if (!trimmed) {
       setEditError('Value cannot be empty.');
       return;
@@ -589,10 +587,10 @@ const Quotations = () => {
                             value={editingValue}
                             onChange={(e) => {
                               const raw = e.target.value;
-                              setEditingValue(entry.type === 'number' ? raw.replace(/\D/g, '') : raw);
+                              setEditingValue(digitsOnly(raw));
                             }}
-                            inputMode={entry.type === 'number' ? 'numeric' : undefined}
-                            pattern={entry.type === 'number' ? '[0-9]*' : undefined}
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
                             placeholder={`Update ${entry.label}`}
                           />
@@ -683,11 +681,11 @@ const Quotations = () => {
                         value={currentValue}
                         onChange={(e) => {
                           const raw = e.target.value;
-                          setCurrentValue(selectedField?.type === 'number' ? raw.replace(/\D/g, '') : raw);
+                          setCurrentValue(digitsOnly(raw));
                         }}
                         onKeyDown={handleKeyPress}
-                        inputMode={selectedField?.type === 'number' ? 'numeric' : undefined}
-                        pattern={selectedField?.type === 'number' ? '[0-9]*' : undefined}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         className="w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none"
                         placeholder="₹ 00000"
                         disabled={isSaving}
