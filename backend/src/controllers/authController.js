@@ -1,7 +1,8 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const Account = require('../models/Account');
 const AccessGroup = require('../models/AccessGroup');
+const Session = require('../models/Session');
 const asyncHandler = require('../utils/asyncHandler');
 const {
   ROLE_DEFINITIONS,
@@ -175,20 +176,29 @@ const syncAccountFromProfile = async (account, profile) => {
   return account;
 };
 
-const COOKIE_NAME = 'pf_token';
+const COOKIE_NAME = 'pf_session';
+const LEGACY_COOKIE_NAME = 'pf_token';
 const COOKIE_MAX_AGE = 1000 * 60 * 60 * 12; // 12 hours
 
 const isProduction = () => process.env.NODE_ENV === 'production';
 
-const buildToken = (account) => jwt.sign(
-  {
-    sub: account._id,
-    username: account.username,
-    role: account.role,
-  },
-  process.env.JWT_SECRET,
-  { expiresIn: '12h' }
-);
+const hashSessionId = (sessionId) => crypto
+  .createHash('sha256')
+  .update(String(sessionId || ''))
+  .digest('hex');
+
+const createSessionForAccount = async (account, req) => {
+  const sessionId = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + COOKIE_MAX_AGE);
+  await Session.create({
+    sessionIdHash: hashSessionId(sessionId),
+    accountId: account._id,
+    expiresAt,
+    lastUsedAt: new Date(),
+    userAgent: String(req.headers?.['user-agent'] || ''),
+  });
+  return sessionId;
+};
 
 const buildCookieOptions = () => ({
   httpOnly: true,
@@ -205,12 +215,14 @@ const attachAuthCookie = (res, token) => {
 };
 
 const clearAuthCookie = (res) => {
-  res.clearCookie(COOKIE_NAME, {
+  const opts = {
     httpOnly: true,
     sameSite: isProduction() ? 'none' : 'lax',
     secure: isProduction(),
     path: '/',
-  });
+  };
+  res.clearCookie(COOKIE_NAME, opts);
+  res.clearCookie(LEGACY_COOKIE_NAME, opts);
 };
 
 const serializeAccount = (accountDoc) => {
@@ -287,9 +299,9 @@ exports.signup = asyncHandler(async (req, res) => {
   account.passwordHash = await bcrypt.hash(password, 10);
   await account.save();
 
-  const token = buildToken(account);
-  attachAuthCookie(res, token);
-  return res.status(201).json({ token, user: serializeAccount(account) });
+  const sessionId = await createSessionForAccount(account, req);
+  attachAuthCookie(res, sessionId);
+  return res.status(201).json({ user: serializeAccount(account) });
 });
 
 exports.login = asyncHandler(async (req, res) => {
@@ -329,9 +341,9 @@ exports.login = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Invalid username or password.' });
   }
 
-  const token = buildToken(account);
-  attachAuthCookie(res, token);
-  return res.json({ token, user: serializeAccount(account) });
+  const sessionId = await createSessionForAccount(account, req);
+  attachAuthCookie(res, sessionId);
+  return res.json({ user: serializeAccount(account) });
 });
 
 // Owner/admin1-only role management
@@ -397,6 +409,9 @@ exports.getProfile = asyncHandler(async (req, res) => {
   // If removed from allowlist, deny profile.
   const groups = await loadGroups();
   if (!isAllowedUsername(account?.username, groups)) {
+    if (req.session?._id) {
+      await Session.deleteOne({ _id: req.session._id }).catch(() => {});
+    }
     clearAuthCookie(res);
     return res.status(403).json({ error: 'This username is no longer allowed.' });
   }
@@ -408,6 +423,10 @@ exports.getProfile = asyncHandler(async (req, res) => {
 });
 
 exports.logout = asyncHandler(async (req, res) => {
+  const sessionId = req.cookies?.[COOKIE_NAME] ? String(req.cookies[COOKIE_NAME]) : null;
+  if (sessionId) {
+    await Session.deleteOne({ sessionIdHash: hashSessionId(sessionId) }).catch(() => {});
+  }
   clearAuthCookie(res);
   return res.json({ success: true });
 });

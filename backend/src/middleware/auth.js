@@ -1,32 +1,44 @@
-const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const Account = require('../models/Account');
+const Session = require('../models/Session');
 const asyncHandler = require('../utils/asyncHandler');
 
+const COOKIE_NAME = 'pf_session';
+
+const hashSessionId = (sessionId) => crypto
+  .createHash('sha256')
+  .update(String(sessionId || ''))
+  .digest('hex');
+
 const authenticate = asyncHandler(async (req, res, next) => {
-  const authHeader = req.headers.authorization || '';
-  let token = null;
-
-  if (authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7);
-  } else if (req.cookies?.pf_token) {
-    token = req.cookies.pf_token;
+  const sessionId = req.cookies?.[COOKIE_NAME] ? String(req.cookies[COOKIE_NAME]) : null;
+  if (!sessionId) {
+    return res.status(401).json({ error: 'Session missing' });
   }
 
-  if (!token) {
-    return res.status(401).json({ error: 'Authorization token missing' });
+  const sessionIdHash = hashSessionId(sessionId);
+  const session = await Session.findOne({ sessionIdHash });
+  if (!session) {
+    return res.status(401).json({ error: 'Invalid session' });
   }
 
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const account = await Account.findById(payload.sub);
-    if (!account) {
-      return res.status(401).json({ error: 'Account not found' });
-    }
-    req.user = account;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  if (session.expiresAt && session.expiresAt <= new Date()) {
+    await Session.deleteOne({ _id: session._id });
+    return res.status(401).json({ error: 'Session expired' });
   }
+
+  const account = await Account.findById(session.accountId);
+  if (!account) {
+    await Session.deleteOne({ _id: session._id });
+    return res.status(401).json({ error: 'Account not found' });
+  }
+
+  session.lastUsedAt = new Date();
+  await session.save().catch(() => {});
+
+  req.user = account;
+  req.session = session;
+  return next();
 });
 
 const requirePermission = (permissionKey) => (req, res, next) => {
