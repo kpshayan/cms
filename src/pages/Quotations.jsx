@@ -58,6 +58,7 @@ const FIELD_SEQUENCE = [
 ];
 
 const DETAILS_FIELDS = [
+  { key: 'quoteNo', label: 'Quote No.' },
   { key: 'name', label: 'Name' },
   { key: 'production', label: 'Production' },
   { key: 'project', label: 'Project' },
@@ -70,6 +71,86 @@ const FIELD_SEQUENCE_KEY_SET = new Set(FIELD_SEQUENCE.map((field) => field.key))
 const FIELD_SEQUENCE_LABEL_MAP = new Map(FIELD_SEQUENCE.map((field) => [field.key, field.label]));
 
 const digitsOnly = (value) => String(value || '').replace(/\D/g, '');
+
+const formatIndianNumber = (num) => {
+  const n = Number(num);
+  if (!Number.isFinite(n)) return '';
+  const str = Math.round(n).toString();
+  const last3 = str.slice(-3);
+  const rest = str.slice(0, -3);
+  const withCommas = rest ? `${rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',')},${last3}` : last3;
+  return withCommas;
+};
+
+const numberToWordsIndian = (num) => {
+  const n = Number(num);
+  if (!Number.isFinite(n) || n < 0) return '';
+  if (n === 0) return 'Zero';
+
+  const ones = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen',
+  ];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const twoDigits = (x) => {
+    const v = x % 100;
+    if (v < 20) return ones[v];
+    const t = Math.floor(v / 10);
+    const o = v % 10;
+    return `${tens[t]}${o ? ` ${ones[o]}` : ''}`.trim();
+  };
+
+  const threeDigits = (x) => {
+    const h = Math.floor(x / 100);
+    const r = x % 100;
+    const head = h ? `${ones[h]} Hundred` : '';
+    const tail = r ? twoDigits(r) : '';
+    return `${head}${head && tail ? ' ' : ''}${tail}`.trim();
+  };
+
+  let remaining = Math.floor(n);
+  const parts = [];
+
+  const crore = Math.floor(remaining / 10000000);
+  remaining %= 10000000;
+  const lakh = Math.floor(remaining / 100000);
+  remaining %= 100000;
+  const thousand = Math.floor(remaining / 1000);
+  remaining %= 1000;
+  const hundredBlock = remaining;
+
+  if (crore) parts.push(`${threeDigits(crore)} Crore`);
+  if (lakh) parts.push(`${threeDigits(lakh)} Lakh`);
+  if (thousand) parts.push(`${threeDigits(thousand)} Thousand`);
+  if (hundredBlock) parts.push(threeDigits(hundredBlock));
+
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+};
+
+const formatIssuedOn = (date = new Date()) => {
+  const d = date instanceof Date ? date : new Date(date);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  const month = months[d.getMonth()] || '';
+  const yyyy = d.getFullYear();
+  return `${dd}${month}'${yyyy}`;
+};
+
+const fetchAsDataUrl = async (url) => {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed to load ${url}`);
+  const blob = await res.blob();
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error(`Failed to read ${url}`));
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsDataURL(blob);
+  });
+};
 
 const sanitizeQuotationEntries = (entries) => {
   const list = Array.isArray(entries) ? entries : [];
@@ -109,6 +190,7 @@ const Quotations = () => {
   const [isFieldMenuOpen, setIsFieldMenuOpen] = useState(false);
 
   const [detailsDraft, setDetailsDraft] = useState({
+    quoteNo: '',
     name: '',
     production: '',
     project: '',
@@ -188,6 +270,7 @@ const Quotations = () => {
     const initial = project?.quotationDetails || {};
     setDetailsDraft((prev) => ({
       ...prev,
+      quoteNo: typeof initial.quoteNo === 'string' ? initial.quoteNo : prev.quoteNo,
       name: typeof initial.name === 'string' ? initial.name : prev.name,
       production: typeof initial.production === 'string' ? initial.production : prev.production,
       project: typeof initial.project === 'string' ? initial.project : prev.project,
@@ -230,61 +313,113 @@ const Quotations = () => {
     };
   }, [isFieldMenuOpen]);
 
-  const buildPdfBlob = (entries) => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text('Project Quotations', 20, 20);
-    doc.setFontSize(12);
-    if (project?.name) {
-      doc.text(`Project: ${project.name}`, 20, 30);
+  const buildPdfBlob = async (entries) => {
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+    const details = project?.quotationDetailsFinalized
+      ? (project?.quotationDetails || detailsDraft)
+      : detailsDraft;
+
+    const quoteNo = String(details?.quoteNo || '').trim();
+    const issuedOn = formatIssuedOn(new Date());
+
+    // Load page templates (exact look comes from these background images)
+    // You must place them in public/quotation-template/page1.png and page2.png
+    let page1;
+    let page2;
+    try {
+      page1 = await fetchAsDataUrl('/quotation-template/page1.png');
+      page2 = await fetchAsDataUrl('/quotation-template/page2.png');
+    } catch {
+      // Fallback: still generate a basic PDF if template images are missing
+      doc.setFontSize(18);
+      doc.text('Quotation', 20, 20);
+      doc.setFontSize(12);
+      doc.text(`Issued On: ${issuedOn}`, 20, 30);
+      doc.text(`Quote No: ${quoteNo || '-'}`, 20, 38);
+      return doc.output('blob');
     }
-    let y = 44;
-    entries.forEach((entry, idx) => {
-      const durationSuffix = String(entry.duration || '').trim()
-        ? ` (Duration: ${String(entry.duration).trim()})`
-        : '';
-      const lines = doc.splitTextToSize(`${entry.label}: ${entry.value}${durationSuffix}`, 170);
-      doc.text(lines, 20, y);
-      y += lines.length * 8;
-      if (y > 270 && idx !== entries.length - 1) {
-        doc.addPage();
-        y = 20;
-      }
+
+    // Page 1 background
+    doc.addImage(page1, 'PNG', 0, 0, 210, 297);
+
+    // Overlay dynamic header values (coordinates tuned for A4 template)
+    // Quote No (left side line)
+    if (quoteNo) {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(11);
+      doc.text(quoteNo, 44, 70);
+    }
+
+    // Issued on (top-right)
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(90, 90, 90);
+    doc.setFontSize(9);
+    doc.text(issuedOn, 166, 63);
+
+    // Issued to (right box)
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(90, 90, 90);
+    doc.setFontSize(9);
+    const rightX = 148;
+    let rightY = 78;
+    const rightLine = (label, value) => {
+      const v = String(value || '').trim();
+      doc.text(`${label}: ${v}`, rightX, rightY);
+      rightY += 5.2;
+    };
+    rightLine('Name', details?.name);
+    rightLine('Production', details?.production);
+    rightLine('Project', details?.project);
+    rightLine('Type', details?.type);
+    rightLine('Producer', details?.producer);
+    rightLine('Contact', details?.contact);
+
+    // Table rows (Description | Duration | Amount)
+    const rows = Array.isArray(entries) ? entries : [];
+    const startY = 129;
+    const rowH = 8;
+    const descX = 24;
+    const durX = 112;
+    const amtX = 190;
+    let y = startY;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(9);
+
+    const amounts = rows.map((r) => Number(digitsOnly(r?.value))).filter((n) => Number.isFinite(n));
+    const total = amounts.reduce((a, b) => a + b, 0);
+
+    rows.slice(0, 6).forEach((entry) => {
+      const desc = String(entry?.label || '').trim();
+      const duration = String(entry?.duration || '').trim();
+      const amt = digitsOnly(entry?.value);
+      doc.text(desc, descX, y);
+      doc.text(duration || '-', durX, y, { align: 'center' });
+      doc.text(`${formatIndianNumber(amt)}/-`, amtX, y, { align: 'right' });
+      y += rowH;
     });
 
-    const detailsFinalized = Boolean(project?.quotationDetailsFinalized);
-    const details = project?.quotationDetails || detailsDraft;
-    const hasAnyDetails = DETAILS_FIELDS.some((field) => String(details?.[field.key] || '').trim());
+    // Total row
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(10);
+    doc.text(`${formatIndianNumber(total)}/-`, amtX, 176, { align: 'right' });
 
-    if (detailsFinalized && hasAnyDetails) {
-      const sectionTitle = 'Details';
-      const needsNewPage = y > 250;
-      if (needsNewPage) {
-        doc.addPage();
-        y = 20;
-      } else {
-        y += 10;
-      }
-
-      doc.setFontSize(13);
-      doc.text(sectionTitle, 20, y);
-      y += 6;
-
-      const boxX = 18;
-      const boxY = y;
-      const boxW = 174;
-
-      doc.setFontSize(11);
-      let textY = y + 8;
-      DETAILS_FIELDS.forEach((field) => {
-        const value = String(details?.[field.key] || '').trim();
-        doc.text(`${field.label}: ${value}`, 22, textY);
-        textY += 7;
-      });
-
-      const boxH = Math.max(10, textY - boxY + 2);
-      doc.rect(boxX, boxY, boxW, boxH);
+    // Total in words line
+    const words = numberToWordsIndian(total);
+    if (words) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(60, 60, 60);
+      doc.text(`${words} Only`, 105, 186, { align: 'center' });
     }
+
+    // Page 2 background (Terms)
+    doc.addPage();
+    doc.addImage(page2, 'PNG', 0, 0, 210, 297);
 
     return doc.output('blob');
   };
@@ -308,8 +443,10 @@ const Quotations = () => {
     setIsSaving(true);
     setSubmitError('');
     try {
-      const pdfBlob = buildPdfBlob(entries);
-      const pdfName = `${(project?.key || 'PROJECT').toUpperCase()}-Quotations.pdf`;
+      const pdfBlob = await buildPdfBlob(entries);
+      const quoteNo = String(project?.quotationDetails?.quoteNo || detailsDraft.quoteNo || '').trim();
+      const baseName = quoteNo || (project?.key || 'PROJECT').toUpperCase();
+      const pdfName = `${baseName}-Quotation.pdf`;
       const pdfBase64 = await blobToBase64(pdfBlob);
       await saveQuotationsForProject(projectId, {
         entries,

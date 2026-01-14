@@ -19,6 +19,7 @@ const quotationVersionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const quotationDetailsSchema = new mongoose.Schema({
+  quoteNo: { type: String, trim: true, default: '' },
   name: { type: String, trim: true, default: '' },
   production: { type: String, trim: true, default: '' },
   project: { type: String, trim: true, default: '' },

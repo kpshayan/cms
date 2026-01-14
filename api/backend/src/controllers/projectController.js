@@ -148,7 +148,7 @@ exports.updateProject = asyncHandler(async (req, res) => {
       project.quotationDetails = undefined;
     } else if (typeof next === 'object') {
       project.quotationDetails = project.quotationDetails || {};
-      const allowedKeys = ['name', 'production', 'project', 'type', 'producer', 'contact'];
+      const allowedKeys = ['quoteNo', 'name', 'production', 'project', 'type', 'producer', 'contact'];
 
       if (next.contact !== undefined) {
         const normalized = normalizePhoneDigits(next.contact);
