@@ -85,8 +85,12 @@ const parseBody = (req) => {
 };
 
 const createReqRes = (context, req) => {
-  const headers = req.headers || {};
-  const cookieHeader = headers.cookie || headers.Cookie || '';
+  const incomingHeaders = req.headers || {};
+  const headers = {};
+  for (const [key, value] of Object.entries(incomingHeaders)) {
+    headers[String(key).toLowerCase()] = value;
+  }
+  const cookieHeader = headers.cookie || '';
 
   const expressReq = {
     method: req.method,
