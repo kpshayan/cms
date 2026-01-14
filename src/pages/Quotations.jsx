@@ -360,6 +360,12 @@ const Quotations = () => {
       return;
     }
 
+    const contact = String(detailsDraft.contact || '').trim();
+    if (!/^\d{10}$/.test(contact)) {
+      setDetailsError('Contact must be a 10-digit mobile number.');
+      return;
+    }
+
     setIsSavingDetails(true);
     try {
       await updateProject(projectId, {
@@ -493,9 +499,19 @@ const Quotations = () => {
                     {isEditingDetails ? (
                       <input
                         value={detailsDraft[field.key]}
-                        onChange={(e) => setDetailsDraft((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const next = field.key === 'contact'
+                            ? raw.replace(/\D/g, '').slice(0, 10)
+                            : raw;
+                          setDetailsDraft((prev) => ({ ...prev, [field.key]: next }));
+                        }}
+                        type={field.key === 'contact' ? 'tel' : 'text'}
+                        inputMode={field.key === 'contact' ? 'numeric' : undefined}
+                        pattern={field.key === 'contact' ? '[0-9]*' : undefined}
+                        maxLength={field.key === 'contact' ? 10 : undefined}
                         className="mt-1 w-full h-11 px-4 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
-                        placeholder={field.label}
+                        placeholder={field.key === 'contact' ? 'Enter mobile number' : field.label}
                         disabled={isSavingDetails}
                       />
                     ) : (

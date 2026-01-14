@@ -2,6 +2,7 @@ const Project = require('../models/Project');
 const Task = require('../models/Task');
 const TeamMember = require('../models/TeamMember');
 const asyncHandler = require('../utils/asyncHandler');
+const { normalizePhoneDigits, isValidMobile10 } = require('../utils/phone');
 
 const normalize = (value) => String(value || '').trim().toLowerCase();
 
@@ -133,6 +134,9 @@ exports.updateProject = asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'Project not found.' });
   }
 
+  const touchingQuotationDetails =
+    req.body.quotationDetails !== undefined || req.body.quotationDetailsFinalized !== undefined;
+
   if (req.body.name) project.name = req.body.name;
   if (req.body.description !== undefined) project.description = req.body.description;
   if (req.body.color) project.color = req.body.color;
@@ -145,8 +149,18 @@ exports.updateProject = asyncHandler(async (req, res) => {
     } else if (typeof next === 'object') {
       project.quotationDetails = project.quotationDetails || {};
       const allowedKeys = ['name', 'production', 'project', 'type', 'producer', 'contact'];
+
+      if (next.contact !== undefined) {
+        const normalized = normalizePhoneDigits(next.contact);
+        if (!isValidMobile10(normalized)) {
+          return res.status(400).json({ error: 'Contact must be a 10-digit mobile number.' });
+        }
+        project.quotationDetails.contact = normalized;
+      }
+
       allowedKeys.forEach((key) => {
         if (next[key] !== undefined) {
+          if (key === 'contact') return;
           project.quotationDetails[key] = next[key];
         }
       });
@@ -155,6 +169,13 @@ exports.updateProject = asyncHandler(async (req, res) => {
 
   if (req.body.quotationDetailsFinalized !== undefined) {
     project.quotationDetailsFinalized = Boolean(req.body.quotationDetailsFinalized);
+  }
+
+  if (touchingQuotationDetails && project.quotationDetailsFinalized) {
+    const contact = project.quotationDetails?.contact;
+    if (!isValidMobile10(contact)) {
+      return res.status(400).json({ error: 'Contact must be a 10-digit mobile number.' });
+    }
   }
 
   await project.save();
