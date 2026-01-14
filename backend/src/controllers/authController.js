@@ -178,6 +178,8 @@ const syncAccountFromProfile = async (account, profile) => {
 const COOKIE_NAME = 'pf_token';
 const COOKIE_MAX_AGE = 1000 * 60 * 60 * 12; // 12 hours
 
+const isProduction = () => process.env.NODE_ENV === 'production';
+
 const buildToken = (account) => jwt.sign(
   {
     sub: account._id,
@@ -190,8 +192,10 @@ const buildToken = (account) => jwt.sign(
 
 const buildCookieOptions = () => ({
   httpOnly: true,
-  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-  secure: process.env.NODE_ENV === 'production',
+  // For Azure Static Web Apps (different domain) + API (different domain), cookies must be cross-site.
+  // Cross-site cookies require SameSite=None and Secure.
+  sameSite: isProduction() ? 'none' : 'lax',
+  secure: isProduction(),
   maxAge: COOKIE_MAX_AGE,
   path: '/',
 });
@@ -203,8 +207,8 @@ const attachAuthCookie = (res, token) => {
 const clearAuthCookie = (res) => {
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: isProduction() ? 'none' : 'lax',
+    secure: isProduction(),
     path: '/',
   });
 };

@@ -1,0 +1,15 @@
+{
+  "name": "projectflow-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Azure Functions API for Azure Static Web Apps",
+  "main": "index.js",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
