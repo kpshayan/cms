@@ -1,8 +1,8 @@
 const bootstrap = require('../shared/bootstrap');
 const { createReqRes, finalizeResponse, runPipeline, sendError } = require('../shared/adapter');
 
-const projectController = require('../../backend/src/controllers/projectController');
-const { authenticate, requirePermission, requireAnyPermission, requireAdmin1 } = require('../../backend/src/middleware/auth');
+const projectController = require('../backend/src/controllers/projectController');
+const { authenticate, requirePermission, requireAnyPermission, requireAdmin1 } = require('../backend/src/middleware/auth');
 
 const withCors = (req, res) => {
   const origin = req.headers?.origin;

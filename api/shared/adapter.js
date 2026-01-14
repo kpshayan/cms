@@ -101,7 +101,19 @@ const runPipeline = async (req, res, handlers) => {
 const sendError = (res, err) => {
   const status = err?.status || err?.statusCode || 500;
   const message = err?.message || 'Server error';
-  res.status(status).json({ error: message });
+  // Always send a JSON body so frontend fetch().json() doesn't throw.
+  // Avoid leaking stack traces in production.
+  const details = process.env.NODE_ENV === 'production'
+    ? undefined
+    : {
+      name: err?.name,
+      message: err?.message,
+    };
+
+  res.status(status).json({
+    error: message,
+    ...(details ? { details } : {}),
+  });
 };
 
 module.exports = {
