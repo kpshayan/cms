@@ -38,6 +38,10 @@ const authenticate = asyncHandler(async (req, res, next) => {
       // Keep this minimal; helpful for debugging signature issues.
       message: err?.message || undefined,
       meta: {
+        authHeaderType: authHeader == null ? null : typeof authHeader,
+        authHeaderLength: String(authHeader || '').length,
+        authHeaderStartsWithBearer: String(authHeader || '').startsWith('Bearer '),
+        authHeaderPreview: String(authHeader || '').slice(0, 40) || null,
         tokenLength: String(token || '').length,
         jwtSecretFingerprint: jwtSecretFingerprint(),
       },
