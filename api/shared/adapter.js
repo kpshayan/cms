@@ -14,6 +14,50 @@ const parseBody = (req) => {
     try {
       return JSON.parse(text);
     } catch {
+      // Fall back to form-encoded or SWA-transformed bodies.
+      const trimmed = String(text || '').trim();
+
+      // application/x-www-form-urlencoded
+      if (trimmed.includes('=') && trimmed.includes('&') && !trimmed.startsWith('{')) {
+        try {
+          const params = new URLSearchParams(trimmed);
+          const obj = {};
+          for (const [k, v] of params.entries()) {
+            obj[k] = v;
+          }
+          return obj;
+        } catch {
+          // ignore
+        }
+      }
+
+      // Observed on SWA: JSON body arrives as a non-JSON string like
+      // {username:phani,password:test123}
+      // Parse that into an object.
+      if (trimmed.startsWith('{') && trimmed.endsWith('}') && !trimmed.includes('"')) {
+        const inner = trimmed.slice(1, -1).trim();
+        if (!inner) return {};
+
+        const obj = {};
+        const parts = inner.split(',').map((p) => p.trim()).filter(Boolean);
+        for (const part of parts) {
+          const idx = part.indexOf(':');
+          if (idx === -1) {
+            return text;
+          }
+          const key = part.slice(0, idx).trim();
+          const rawValue = part.slice(idx + 1).trim();
+          if (!key) return text;
+
+          let value = rawValue;
+          if (rawValue === 'true') value = true;
+          else if (rawValue === 'false') value = false;
+          else if (rawValue !== '' && !Number.isNaN(Number(rawValue))) value = Number(rawValue);
+          obj[key] = value;
+        }
+        return obj;
+      }
+
       return text;
     }
   };
