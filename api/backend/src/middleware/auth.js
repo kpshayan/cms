@@ -1,13 +1,6 @@
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const Account = require('../models/Account');
 const asyncHandler = require('../utils/asyncHandler');
-
-const jwtSecretFingerprint = () => (
-  process.env.JWT_SECRET
-    ? crypto.createHash('sha256').update(String(process.env.JWT_SECRET)).digest('hex').slice(0, 12)
-    : null
-);
 
 const authenticate = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization || '';
@@ -43,23 +36,7 @@ const authenticate = asyncHandler(async (req, res, next) => {
     }
     throw lastErr || new Error('Token verification failed');
   } catch (err) {
-    return res.status(401).json({
-      error: 'Invalid or expired token',
-      reason: err?.name || 'UnknownError',
-      // Keep this minimal; helpful for debugging signature issues.
-      message: err?.message || undefined,
-      meta: {
-        authHeaderType: authHeader == null ? null : typeof authHeader,
-        authHeaderLength: String(authHeader || '').length,
-        authHeaderStartsWithBearer: String(authHeader || '').startsWith('Bearer '),
-        authHeaderPreview: String(authHeader || '').slice(0, 40) || null,
-        cookieTokenPresent: Boolean(cookieToken),
-        bearerTokenPresent: Boolean(bearerToken),
-        cookieTokenLength: String(cookieToken || '').length,
-        bearerTokenLength: String(bearerToken || '').length,
-        jwtSecretFingerprint: jwtSecretFingerprint(),
-      },
-    });
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 });
 

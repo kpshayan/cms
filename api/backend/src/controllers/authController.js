@@ -1,6 +1,5 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const Account = require('../models/Account');
 const AccessGroup = require('../models/AccessGroup');
 const asyncHandler = require('../utils/asyncHandler');
@@ -191,11 +190,6 @@ const buildToken = (account) => jwt.sign(
   { expiresIn: '12h' }
 );
 
-const jwtSecretFingerprint = () => (
-  process.env.JWT_SECRET
-    ? crypto.createHash('sha256').update(String(process.env.JWT_SECRET)).digest('hex').slice(0, 12)
-    : null
-);
 
 const buildCookieOptions = () => ({
   httpOnly: true,
@@ -294,14 +288,7 @@ exports.signup = asyncHandler(async (req, res) => {
 
   const token = buildToken(account);
   attachAuthCookie(res, token);
-  return res.status(201).json({
-    token,
-    user: serializeAccount(account),
-    meta: {
-      tokenLength: String(token || '').length,
-      jwtSecretFingerprint: jwtSecretFingerprint(),
-    },
-  });
+  return res.status(201).json({ token, user: serializeAccount(account) });
 });
 
 exports.login = asyncHandler(async (req, res) => {
@@ -343,14 +330,7 @@ exports.login = asyncHandler(async (req, res) => {
 
   const token = buildToken(account);
   attachAuthCookie(res, token);
-  return res.json({
-    token,
-    user: serializeAccount(account),
-    meta: {
-      tokenLength: String(token || '').length,
-      jwtSecretFingerprint: jwtSecretFingerprint(),
-    },
-  });
+  return res.json({ token, user: serializeAccount(account) });
 });
 
 // Owner/admin1-only role management
