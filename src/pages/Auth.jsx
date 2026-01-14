@@ -12,7 +12,12 @@ const normalizeMode = (value) => {
 const Auth = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login, signup } = useAuth();
+  const {
+    login,
+    signup,
+    resetAccount,
+    error: authError,
+  } = useAuth();
 
   const initialMode = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -28,6 +33,8 @@ const Auth = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -42,6 +49,7 @@ const Auth = () => {
     setUsername('');
     setPassword('');
     setConfirmPassword('');
+    setStatusMessage('');
     setShowPassword(false);
     setShowConfirmPassword(false);
     navigate(`/auth?mode=${normalized}`, { replace: true });
@@ -49,9 +57,16 @@ const Auth = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setStatusMessage('');
+
     if (isSignIn) {
-      const ok = await login(username, password);
-      if (ok) navigate('/dashboard');
+      try {
+        setSubmitting(true);
+        const ok = await login(username, password);
+        if (ok) navigate('/dashboard');
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
 
@@ -59,8 +74,36 @@ const Auth = () => {
       return;
     }
 
-    const ok = await signup(username, password);
-    if (ok) navigate('/dashboard');
+    try {
+      setSubmitting(true);
+      const ok = await signup(username, password);
+      if (ok) navigate('/dashboard');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    setStatusMessage('');
+    if (!username.trim()) {
+      setStatusMessage('Enter your username first, then click reset.');
+      return;
+    }
+    try {
+      setSubmitting(true);
+      await resetAccount(username);
+      setStatusMessage('Password removed. Now sign up again with a new password.');
+      setMode('signup');
+      setPassword('');
+      setConfirmPassword('');
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+      navigate('/auth?mode=signup', { replace: true });
+    } catch {
+      // error already handled by context
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -81,6 +124,21 @@ const Auth = () => {
             <div className="p-8 sm:p-10 flex flex-col justify-center">
               <h2 className="text-3xl font-bold text-jira-gray dark:text-gray-100">Welcome back</h2>
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Sign in to your account to continue</p>
+
+              {(authError || statusMessage) && (
+                <div className="mt-6 space-y-2">
+                  {authError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-500/10 dark:text-red-200">
+                      {authError}
+                    </div>
+                  )}
+                  {statusMessage && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/10 dark:text-emerald-200">
+                      {statusMessage}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="mt-8 space-y-5" autoComplete="off">
                 <div>
@@ -131,10 +189,20 @@ const Auth = () => {
 
                 <button
                   type="submit"
+                  disabled={submitting}
                   className="w-full rounded-full py-3 font-semibold text-white bg-gradient-to-r from-jira-blue to-jira-blue-light hover:shadow-lg active:scale-[0.99] transition flex items-center justify-center gap-2"
                 >
                   <span>Sign In</span>
                   <span aria-hidden>→</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  disabled={submitting}
+                  className="w-full rounded-full py-3 font-semibold text-jira-blue border border-jira-blue/30 hover:bg-jira-blue/5 transition"
+                >
+                  Reset password for this username
                 </button>
 
                 <div className="text-center text-sm text-gray-600 dark:text-gray-300">
@@ -229,6 +297,7 @@ const Auth = () => {
 
                 <button
                   type="submit"
+                  disabled={submitting}
                   className="w-full rounded-full py-3 font-semibold text-white bg-gradient-to-r from-jira-blue to-jira-blue-light hover:shadow-lg active:scale-[0.99] transition"
                 >
                   Create account
@@ -236,6 +305,8 @@ const Auth = () => {
 
                 <button
                   type="button"
+                  onClick={handleResetPassword}
+                  disabled={submitting}
                   className="w-full text-sm font-semibold text-jira-blue hover:text-jira-blue-light transition"
                 >
                   Reset password
