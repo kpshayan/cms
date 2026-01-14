@@ -178,6 +178,245 @@ const fetchFirstAvailableAsDataUrl = async (urls) => {
   throw lastError || new Error('No template URLs provided');
 };
 
+const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, total, totalWords }) => {
+  const navy = [7, 25, 49];
+  const gold = [214, 155, 60];
+  const gray = [110, 110, 110];
+  const lightGray = [150, 150, 150];
+  const orange = [244, 179, 81];
+  const pageW = 210;
+
+  const tableX = 12;
+  const tableW = 186;
+  const headerY = 122;
+  const headerH = 10;
+  const bodyStartY = headerY + headerH + 8;
+  const pageBottomY = 286;
+  const lastPageFooterReserve = 86; // total + words + terms + padding
+
+  const maxDescW = 72;
+  const maxDurW = 78;
+
+  const getRowLayout = (entry) => {
+    const desc = String(entry?.label || '').trim() || '-';
+    const duration = String(entry?.duration || '').trim() || '-';
+    const amount = digitsOnly(entry?.value);
+    const descLines = doc.splitTextToSize(desc, maxDescW);
+    const durLines = doc.splitTextToSize(duration, maxDurW);
+    const lineCount = Math.max(descLines.length, durLines.length);
+    const lineH = 4.4;
+    const rowH = Math.max(10, lineCount * lineH);
+    return { descLines, durLines, amount, rowH };
+  };
+
+  const drawPageHeader = async ({ pageIndex }) => {
+    // --- Header band ---
+    doc.setFillColor(...navy);
+    doc.rect(0, 0, pageW, 38, 'F');
+    doc.setFillColor(255, 255, 255);
+    doc.ellipse(120, 40, 130, 34, 'F');
+
+    // Logo (optional): public/quotation-template/logo.png (or .jpg)
+    try {
+      const logoData = await fetchFirstAvailableAsDataUrl([
+        '/quotation-template/logo.png',
+        '/quotation-template/logo.jpg',
+        '/quotation-template/logo.jpeg',
+      ]);
+      const fmt = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(logoData, fmt, 14, 8, 22, 22);
+    } catch {
+      // ok
+    }
+
+    // Company name (top-left)
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...gold);
+    doc.setFontSize(18);
+    doc.text('mayasabha', 40, 18);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('STUDIOS', 42, 26);
+
+    // Top-right date
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(10);
+    doc.text(issuedOn, 196, 52, { align: 'right' });
+
+    // Title
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(90, 90, 90);
+    doc.setFontSize(34);
+    doc.text('Quotation', 14, 66);
+
+    // Quote number
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(120, 120, 120);
+    doc.setFontSize(12);
+    doc.text(`Quote No. ${quoteNo || '-'}`, 16, 76);
+
+    // Left company details: keep unchanged (as per your template)
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...lightGray);
+    doc.setFontSize(11);
+    const leftX = 16;
+    let leftY = 84;
+    const leftLine = (text) => {
+      doc.text(text, leftX, leftY);
+      leftY += 6;
+    };
+    leftLine('P: +91 96666 38 123');
+    leftLine('E: info@mayasabhastudios.com');
+    leftLine('A: Flat No. 1-62/5/203-303, Kavuri Supreme Enclave,');
+    leftLine('   Kavuri Hills, Hyderabad 500033');
+    leftLine('GST No: 36AACCM7226P1Z0');
+
+    // Right block: Issued On + Issued To
+    const blockX = 118;
+    const blockY = 68;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...gray);
+    doc.setFontSize(11);
+    doc.text('ISSUED ON:', blockX, blockY);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(110, 110, 110);
+    doc.text(issuedOn, blockX + 38, blockY);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...gray);
+    doc.text('ISSUED TO', blockX, blockY + 8);
+
+    const labelX = blockX;
+    const valueX = blockX + 32;
+    let y = blockY + 16;
+    const line = (label, value) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(120, 120, 120);
+      doc.text(`${label}:`, labelX, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      doc.text(String(value || '-'), valueX, y);
+      y += 6;
+    };
+    line('Name', details?.name);
+    line('Production', details?.production);
+    line('Project', details?.project);
+    line('Type', details?.type);
+    line('Producer', details?.producer);
+    line('Contact', details?.contact);
+
+    // Table header
+    doc.setFillColor(...orange);
+    doc.rect(tableX, headerY, tableW, headerH, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(11);
+    doc.text('Description', tableX + 55, headerY + 7, { align: 'center' });
+    doc.text('Duration', tableX + 112, headerY + 7, { align: 'center' });
+    doc.text('Amount (₹)', tableX + 170, headerY + 7, { align: 'center' });
+
+    // (Optional) show page number if multiple pages
+    if (pageIndex > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(150, 150, 150);
+      doc.setFontSize(9);
+      doc.text(`Page ${pageIndex + 1}`, 196, 58, { align: 'right' });
+    }
+  };
+
+  const drawFooter = (startY) => {
+    const totalH = 12;
+    const wordsH = 10;
+
+    const totalY = startY;
+    doc.setFillColor(...orange);
+    doc.rect(tableX, totalY, tableW, totalH, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(12);
+    doc.text('Total', tableX + 105, totalY + 8, { align: 'center' });
+    doc.text(`${formatIndianNumber(total)}/-`, tableX + 170, totalY + 8, { align: 'center' });
+
+    const wordsY = totalY + totalH;
+    doc.setFillColor(...orange);
+    doc.rect(tableX, wordsY, tableW, wordsH, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(90, 90, 90);
+    doc.setFontSize(11);
+    doc.text(`${(totalWords || '').trim()} Only`.trim(), tableX + 105, wordsY + 7, { align: 'center' });
+
+    const termsY = wordsY + wordsH + 18;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(120, 120, 120);
+    doc.setFontSize(12);
+    doc.text('Terms & Conditions', 16, termsY);
+    doc.setDrawColor(160, 160, 160);
+    doc.line(16, termsY + 1.5, 65, termsY + 1.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(10.5);
+    const bullets = [
+      'This quote is only for preliminary understanding, acceptance, and locking of the project. The Contract will contain all details.',
+      'The info mentioned in this quote is confidential and only applicable to this project and hence not to share with anyone else.',
+      'The above quote is valid for 30 days from the date of issue.',
+    ];
+    let by = termsY + 10;
+    bullets.forEach((text) => {
+      const lines = doc.splitTextToSize(text, 180);
+      doc.text('•', 18, by);
+      doc.text(lines, 22, by);
+      by += lines.length * 5.2 + 2;
+    });
+  };
+
+  // Prepare row layouts up-front (so row height is stable)
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const layouts = (Array.isArray(rows) ? rows : []).map((entry) => ({ entry, layout: getRowLayout(entry) }));
+
+  let pageIndex = 0;
+  await drawPageHeader({ pageIndex });
+
+  const descX = tableX + 18;
+  const durX = tableX + 98;
+  const amtX = tableX + 170;
+  const rowIndexX = tableX + 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.setFontSize(10);
+
+  let y = bodyStartY;
+  for (let i = 0; i < layouts.length; i += 1) {
+    const { entry, layout } = layouts[i];
+    const isLastRowOverall = i === layouts.length - 1;
+    const limit = pageBottomY - (isLastRowOverall ? lastPageFooterReserve : 0);
+
+    if (y + layout.rowH > limit) {
+      doc.addPage();
+      pageIndex += 1;
+      await drawPageHeader({ pageIndex });
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(10);
+      y = bodyStartY;
+    }
+
+    doc.text(String(i + 1), rowIndexX, y);
+    doc.text(layout.descLines, descX, y);
+    doc.text(layout.durLines, durX, y, { align: 'center' });
+    doc.text(`${formatIndianNumber(layout.amount)}/-`, amtX, y, { align: 'center' });
+
+    y += layout.rowH;
+  }
+
+  // Footer (totals + terms) on the last page
+  const footerStartY = Math.max(y + 6, 150);
+  drawFooter(footerStartY);
+};
+
 const sanitizeQuotationEntries = (entries) => {
   const list = Array.isArray(entries) ? entries : [];
   return list
@@ -349,140 +588,22 @@ const Quotations = () => {
     const quoteNo = formatQuoteNo(details?.quoteNo);
     const issuedOn = formatIssuedOn(new Date());
 
-    // Load page templates (exact look comes from these background images)
-    // Place them in public/quotation-template/ (common names supported)
-    let page1;
-    let page2;
-    try {
-      page1 = await fetchFirstAvailableAsDataUrl([
-        '/quotation-template/page1.png',
-        '/quotation-template/page1.jpg',
-        '/quotation-template/page1.jpeg',
-        '/quotation-template/page1.png.jpg',
-        '/quotation-template/page1.png.jpeg',
-      ]);
-      page2 = await fetchFirstAvailableAsDataUrl([
-        '/quotation-template/page2.png',
-        '/quotation-template/page2.jpg',
-        '/quotation-template/page2.jpeg',
-        '/quotation-template/page2.png.jpg',
-        '/quotation-template/page2.png.jpeg',
-      ]);
-    } catch {
-      // Fallback: still generate a basic PDF if template images are missing
-      doc.setFontSize(18);
-      doc.text('Quotation', 20, 20);
-      doc.setFontSize(12);
-      doc.text(`Issued On: ${issuedOn}`, 20, 30);
-      doc.text(`Quote No: ${quoteNo || '-'}`, 20, 38);
-      return doc.output('blob');
-    }
-
-    // Page 1 background (template)
-    doc.addImage(page1, 'JPEG', 0, 0, 210, 297);
-
-    // Wipe any sample/placeholder text baked into the template image.
-    // These rectangles are intentionally a bit generous.
-    doc.setFillColor(255, 255, 255);
-    // Quote No value area (left)
-    doc.rect(30, 81, 85, 12, 'F');
-    // Issued On value area (right)
-    doc.rect(142, 62, 60, 10, 'F');
-    // Issued To values area (right block)
-    doc.rect(150, 73, 55, 42, 'F');
-    // Table body area (rows)
-    doc.rect(18, 126, 190, 35, 'F');
-    // Total value area
-    doc.rect(150, 163, 55, 10, 'F');
-    // Total words area
-    doc.rect(30, 173, 170, 9, 'F');
-
-    // Overlay dynamic header values (coordinates tuned for this template)
-    // Quote No (left side)
-    if (quoteNo) {
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(85, 85, 85);
-      doc.setFontSize(12);
-      doc.text(quoteNo, 58, 89);
-    }
-
-    // Issued on (top-right)
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(90, 90, 90);
-    doc.setFontSize(10);
-    doc.text(issuedOn, 176, 69, { align: 'right' });
-
-    // Issued to (right box): template already prints labels, so we print values only.
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
-    doc.setFontSize(10);
-    const rightX = 170;
-    let rightY = 79.5;
-    const rightValue = (value) => {
-      const v = String(value || '').trim();
-      doc.text(v || '-', rightX, rightY);
-      rightY += 6;
-    };
-    rightValue(details?.name);
-    rightValue(details?.production);
-    rightValue(details?.project);
-    rightValue(details?.type);
-    rightValue(details?.producer);
-    rightValue(details?.contact);
-
-    // Table rows (Description | Duration | Amount)
-    const rows = Array.isArray(entries) ? entries : [];
-    const startY = 135;
-    const rowH = 10;
-    const descX = 25;
-    const durX = 118;
-    const amtX = 194;
-    let y = startY;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60, 60, 60);
-    doc.setFontSize(10);
-
-    const amounts = rows.map((r) => Number(digitsOnly(r?.value))).filter((n) => Number.isFinite(n));
+    const safeRows = Array.isArray(entries) ? entries : [];
+    const amounts = safeRows
+      .map((r) => Number(digitsOnly(r?.value)))
+      .filter((n) => Number.isFinite(n));
     const total = amounts.reduce((a, b) => a + b, 0);
-
-    const descMaxWidth = 75;
-    const durMaxWidth = 75;
-    rows.slice(0, 3).forEach((entry) => {
-      const desc = String(entry?.label || '').trim();
-      const duration = String(entry?.duration || '').trim();
-      const amt = digitsOnly(entry?.value);
-
-      const descLines = doc.splitTextToSize(desc || '-', descMaxWidth);
-      const durLines = doc.splitTextToSize(duration || '-', durMaxWidth);
-      const lines = Math.max(descLines.length, durLines.length);
-      const lineH = 4.2;
-
-      doc.text(descLines, descX, y);
-      doc.text(durLines, durX, y, { align: 'center' });
-      doc.text(`${formatIndianNumber(amt)}/-`, amtX, y, { align: 'right' });
-
-      y += Math.max(rowH, lines * lineH);
-    });
-
-    // Total row
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(60, 60, 60);
-    doc.setFontSize(11);
-    doc.text(`${formatIndianNumber(total)}/-`, amtX, 170, { align: 'right' });
-
-    // Total in words line
     const words = numberToWordsIndian(total);
-    if (words) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(60, 60, 60);
-      doc.text(`${words} Only`, 105, 179.5, { align: 'center' });
-    }
 
-    // Page 2 background (Terms)
-    doc.addPage();
-    doc.addImage(page2, 'JPEG', 0, 0, 210, 297);
+    await drawQuotationTemplate({
+      doc,
+      issuedOn,
+      quoteNo,
+      details,
+      rows: safeRows,
+      total,
+      totalWords: words,
+    });
 
     return doc.output('blob');
   };
