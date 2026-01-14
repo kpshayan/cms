@@ -6,12 +6,12 @@
       "direction": "in",
       "name": "req",
       "methods": ["get", "options"],
-      "route": "diag/{*path}"
+      "route": "diag"
     },
     {
       "type": "http",
       "direction": "out",
-      "name": "$return"
+      "name": "res"
     }
   ]
 }
