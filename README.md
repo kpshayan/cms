@@ -32,6 +32,30 @@ A complete, modern Scrum management application built with React and Tailwind CS
 - **MongoDB + Mongoose** - Cloud data persistence
 - **JWT + bcrypt** - Authentication & password security
 
+## ♨️ Always-Warm API (No Cold Starts)
+
+Azure Static Web Apps “managed” Functions can go cold on idle. If you need consistently fast login/projects (always warm), use a **linked Azure Function App on a Premium plan** and keep **Always Ready instances = 1**.
+
+### Production Setup (Recommended)
+1. Azure Portal → Create → **Function App**
+	- Runtime: **Node.js 18**
+	- Plan: **Premium (EP1 or higher)**
+	- Configure **Always Ready instances = 1**
+
+2. Function App → Configuration → Application settings
+	- Add `MONGODB_URI`, `JWT_SECRET`, and optionally `ADMIN1_USERNAMES`/`ADMIN2_USERNAMES`/`ADMIN4_USERNAMES`.
+
+3. Static Web App → **Backends / API** → **Link backend**
+	- Link the Premium Function App so requests stay on the same origin path (`/api/...`) and cookie auth keeps working.
+
+4. GitHub Actions secrets
+	- This repo deploys the API via `.github/workflows/deploy-functionapp.yml`.
+	- Add secrets:
+	  - `AZURE_FUNCTIONAPP_NAME`
+	  - `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` (Function App → “Get publish profile”)
+
+Optional: keep it extra hot with the scheduled ping workflow by setting `WARMUP_URL` = `https://<your-swa-domain>/api/warmup`.
+
 ## 📦 Installation
 
 ### Frontend (Vite)

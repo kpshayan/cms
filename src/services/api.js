@@ -54,6 +54,11 @@ const apiCall = async (url, options = {}) => {
   return response.json();
 };
 
+// Warmup API
+export const warmupAPI = {
+  ping: () => apiCall('/warmup', { method: 'GET' }),
+};
+
 // Auth API
 export const authAPI = {
   signup: (data) => apiCall('/auth/signup', { 
