@@ -467,6 +467,11 @@ const Quotations = () => {
   const [detailsError, setDetailsError] = useState('');
   const [isSavingDetails, setIsSavingDetails] = useState(false);
 
+  const detailsBoxRef = useRef(null);
+  const fieldMenuPopupRef = useRef(null);
+  const detailsAttentionTimeoutRef = useRef(null);
+  const [detailsNeedsAttention, setDetailsNeedsAttention] = useState(false);
+
   const nextFieldRef = useRef(null);
   const fieldMenuRef = useRef(null);
   const existingQuotations = getQuotationsForProject(projectId);
@@ -578,6 +583,50 @@ const Quotations = () => {
     };
   }, [isFieldMenuOpen]);
 
+  useEffect(() => {
+    return () => {
+      if (detailsAttentionTimeoutRef.current) {
+        clearTimeout(detailsAttentionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const scrollIntoViewIfNeeded = (node, { padding = 24, behavior = 'smooth' } = {}) => {
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+    const topOverflow = rect.top - padding;
+    const bottomOverflow = rect.bottom + padding - viewportHeight;
+
+    if (topOverflow < 0) {
+      window.scrollBy({ top: topOverflow, behavior });
+      return;
+    }
+    if (bottomOverflow > 0) {
+      window.scrollBy({ top: bottomOverflow, behavior });
+    }
+  };
+
+  const ensureServiceRowVisible = () => {
+    if (!nextFieldRef.current) return;
+    scrollIntoViewIfNeeded(nextFieldRef.current);
+  };
+
+  const ensureDropdownVisible = () => {
+    if (!fieldMenuPopupRef.current) return;
+    scrollIntoViewIfNeeded(fieldMenuPopupRef.current);
+  };
+
+  useEffect(() => {
+    if (!isFieldMenuOpen) return;
+    const raf = requestAnimationFrame(() => {
+      ensureServiceRowVisible();
+      ensureDropdownVisible();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isFieldMenuOpen]);
+
   const buildPdfBlob = async (entries) => {
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
@@ -622,6 +671,20 @@ const Quotations = () => {
     if (!projectId || isSaving) return;
     if (!project?.quotationDetailsFinalized) {
       setSubmitError('Please finalize the details box before generating the PDF.');
+
+      setDetailsNeedsAttention(true);
+      if (detailsAttentionTimeoutRef.current) {
+        clearTimeout(detailsAttentionTimeoutRef.current);
+      }
+      detailsAttentionTimeoutRef.current = setTimeout(() => {
+        setDetailsNeedsAttention(false);
+      }, 2200);
+
+      requestAnimationFrame(() => {
+        if (detailsBoxRef.current) {
+          detailsBoxRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
       return;
     }
     setIsSaving(true);
