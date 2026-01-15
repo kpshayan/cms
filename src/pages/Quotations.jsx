@@ -252,25 +252,25 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
   const drawPageHeader = async ({ pageIndex }) => {
     addTemplateBackground(pageIndex);
 
+    // Logo (optional): always overlay on top of the template/background.
+    try {
+      const logoData = await fetchFirstAvailableAsDataUrl([
+        '/quotation-template/logo.png',
+        '/quotation-template/logo.jpg',
+        '/quotation-template/logo.jpeg',
+      ]);
+      const fmt = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(logoData, fmt, 14, 8, 22, 22);
+    } catch {
+      // ok
+    }
+
     if (!hasTemplateBackground) {
       // --- Header band ---
       doc.setFillColor(...navy);
       doc.rect(0, 0, pageW, 38, 'F');
       doc.setFillColor(255, 255, 255);
       doc.ellipse(120, 40, 130, 34, 'F');
-
-      // Logo (optional): public/quotation-template/logo.png (or .jpg)
-      try {
-        const logoData = await fetchFirstAvailableAsDataUrl([
-          '/quotation-template/logo.png',
-          '/quotation-template/logo.jpg',
-          '/quotation-template/logo.jpeg',
-        ]);
-        const fmt = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-        doc.addImage(logoData, fmt, 14, 8, 22, 22);
-      } catch {
-        // ok
-      }
 
       // Company name (top-left)
       doc.setFont('helvetica', 'bold');
