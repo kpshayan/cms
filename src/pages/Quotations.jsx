@@ -249,20 +249,23 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
   const maxDescW = 72;
   const maxDurW = 78;
 
-  const getRowLayout = (entry) => {
+  const getRowLayout = (entry, { lineH = 4.4, minRowH = 10 } = {}) => {
     const desc = String(entry?.label || '').trim() || '-';
     const duration = String(entry?.duration || '').trim() || '-';
     const amount = digitsOnly(entry?.value);
     const descLines = doc.splitTextToSize(desc, maxDescW);
     const durLines = doc.splitTextToSize(duration, maxDurW);
     const lineCount = Math.max(descLines.length, durLines.length);
-    const lineH = 4.4;
-    const rowH = Math.max(10, lineCount * lineH);
+    const rowH = Math.max(minRowH, lineCount * lineH);
     return { descLines, durLines, amount, rowH };
   };
 
-  const drawPageHeader = async ({ pageIndex }) => {
-    addTemplateBackground(pageIndex);
+  const drawPageHeader = async ({ mode = 'content' } = {}) => {
+    // Page 1 only: draw background + all dynamic overlays.
+    addTemplateBackground(0);
+
+    // Page-2 requirement: template-only page must not contain any dynamic overlays.
+    if (mode === 'templateOnly') return;
 
     // Logo (optional): always overlay on top of the template/background.
     try {
@@ -388,13 +391,7 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
       doc.text('Amount (₹)', tableX + 170, headerY + 7, { align: 'center' });
     }
 
-    // (Optional) show page number if multiple pages
-    if (pageIndex > 0) {
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(150, 150, 150);
-      doc.setFontSize(9);
-      doc.text(`Page ${pageIndex + 1}`, 196, 58, { align: 'right' });
-    }
+    // Intentionally no page numbers: the output is a fixed 2-page PDF.
   };
 
   const drawFooter = (startY) => {
@@ -459,13 +456,29 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
     });
   };
 
-  // Prepare row layouts up-front (so row height is stable)
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  const layouts = (Array.isArray(rows) ? rows : []).map((entry) => ({ entry, layout: getRowLayout(entry) }));
+  // Prepare row layouts up-front.
+  // IMPORTANT: all rows must remain on page 1 (do not paginate onto page 2).
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const bodyAvailableH = (pageBottomY - lastPageFooterReserve) - bodyStartY;
 
-  let pageIndex = 0;
-  await drawPageHeader({ pageIndex });
+  let fontSize = 10;
+  let lineH = 4.4;
+  let minRowH = 10;
+  let layouts = [];
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(fontSize);
+    layouts = safeRows.map((entry) => ({ entry, layout: getRowLayout(entry, { lineH, minRowH }) }));
+    const requiredH = layouts.reduce((sum, item) => sum + (item?.layout?.rowH || 0), 0);
+    if (requiredH <= bodyAvailableH) break;
+
+    // Shrink until it fits, keeping everything on page 1.
+    fontSize = Math.max(7, fontSize - 1);
+    lineH = Math.max(3.2, lineH - 0.3);
+    minRowH = Math.max(7, minRowH - 1);
+  }
+
+  await drawPageHeader({ mode: 'content' });
 
   const descX = tableX + 18;
   const durX = tableX + 98;
@@ -474,24 +487,11 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(60, 60, 60);
-  doc.setFontSize(10);
+  doc.setFontSize(fontSize);
 
   let y = bodyStartY;
   for (let i = 0; i < layouts.length; i += 1) {
-    const { entry, layout } = layouts[i];
-    const isLastRowOverall = i === layouts.length - 1;
-    const limit = pageBottomY - (isLastRowOverall ? lastPageFooterReserve : 0);
-
-    if (y + layout.rowH > limit) {
-      doc.addPage();
-      pageIndex += 1;
-      await drawPageHeader({ pageIndex });
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(10);
-      y = bodyStartY;
-    }
-
+    const { layout } = layouts[i];
     doc.text(String(i + 1), rowIndexX, y);
     doc.text(layout.descLines, descX, y);
     doc.text(layout.durLines, durX, y, { align: 'center' });
@@ -500,17 +500,17 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
     y += layout.rowH;
   }
 
-  // Ensure at least 2 pages for the final template (page 1 + page 2)
-  if (pageIndex === 0) {
-    doc.addPage();
-    pageIndex += 1;
-    await drawPageHeader({ pageIndex });
-    y = bodyStartY;
-  }
-
-  // Footer (totals + terms) on the last page
+  // Footer (totals + terms) must always be on page 1.
   const footerStartY = Math.max(y + 6, 150);
   drawFooter(footerStartY);
+
+  // Page 2 must be template-only, matching `page2.png.jpg` exactly (no overlays).
+  doc.addPage();
+  if (templatePage2 || templatePage1) {
+    const bg = templatePage2 || templatePage1;
+    const fmt = bg.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+    doc.addImage(bg, fmt, 0, 0, pageW, 297);
+  }
 };
 
 const sanitizeQuotationEntries = (entries) => {
