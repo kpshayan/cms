@@ -86,6 +86,10 @@ const Summary = () => {
     quotationDetails.contact,
   ].some((value) => String(value || '').trim());
 
+  const showDetailsPanel = hasQuotationDetails;
+  const showSnapshotPanel = isAdminOne && hasQuotations;
+  const topPanelsCols = showDetailsPanel && showSnapshotPanel ? 'lg:grid-cols-2' : 'lg:grid-cols-1';
+
   const quotationVersions = Array.isArray(project?.quotationVersions) ? project.quotationVersions : [];
   const sortedQuotationVersions = quotationVersions
     .slice()
@@ -324,25 +328,9 @@ const Summary = () => {
   return (
     <div className="p-8 bg-jira-bg min-h-screen">
       {/* Header with Add Task Button */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <div className="min-w-0">
           <h2 className="text-2xl font-bold text-jira-gray">Project Overview</h2>
-        </div>
-
-        <div className="flex justify-center">
-          {hasQuotationDetails && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-5 w-full max-w-md">
-              <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Details</p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-gray-700">
-                <div className="truncate"><span className="font-semibold">Name:</span> {quotationDetails.name}</div>
-                <div className="truncate"><span className="font-semibold">Type:</span> {quotationDetails.type}</div>
-                <div className="truncate"><span className="font-semibold">Production:</span> {quotationDetails.production}</div>
-                <div className="truncate"><span className="font-semibold">Producer:</span> {quotationDetails.producer}</div>
-                <div className="truncate"><span className="font-semibold">Project:</span> {quotationDetails.project}</div>
-                <div className="truncate"><span className="font-semibold">Contact:</span> {quotationDetails.contact}</div>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="flex justify-start lg:justify-end">
@@ -389,57 +377,92 @@ const Summary = () => {
         />
       </div>
 
-      {isAdminOne && hasQuotations && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-xl font-bold text-jira-gray">Quotations Snapshot</h3>
-              <p className="text-sm text-gray-500">Latest inputs from the Quotations flow.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-jira-blue bg-blue-50 px-3 py-1 rounded-full">
-                {quotationEntries.length} fields
-              </span>
-              <button
-                type="button"
-                aria-label="Send quotations"
-                className="group inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-jira-blue border border-blue-100 hover:bg-blue-100 transition focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
-              >
-                <Send className="w-4 h-4 paper-plane-float group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:rotate-12 transition-transform duration-300" />
-              </button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto pr-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-3">
-              {quotationEntries.map((entry) => (
-                <div
-                  key={entry.key}
-                  className="border border-gray-100 rounded-xl p-2 bg-gray-50/80 h-20 flex flex-col overflow-hidden"
+      {(showDetailsPanel || showSnapshotPanel) && (
+        <div className={`grid grid-cols-1 ${topPanelsCols} gap-6 mb-8 items-stretch`}>
+          {showDetailsPanel && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-jira-gray">Details</h3>
+                  <p className="text-sm text-gray-500">Key quotation information for this project.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm text-gray-700">
+                <div className="truncate"><span className="font-semibold">Name:</span> {quotationDetails.name}</div>
+                <div className="truncate"><span className="font-semibold">Type:</span> {quotationDetails.type}</div>
+                <div className="truncate"><span className="font-semibold">Production:</span> {quotationDetails.production}</div>
+                <div className="truncate"><span className="font-semibold">Producer:</span> {quotationDetails.producer}</div>
+                <div className="truncate"><span className="font-semibold">Project:</span> {quotationDetails.project}</div>
+                <div className="truncate"><span className="font-semibold">Contact:</span> {quotationDetails.contact}</div>
+              </div>
+
+              <div className="mt-6">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 bg-jira-blue text-white px-6 py-3 rounded-full hover:bg-jira-blue-light transition-all duration-200 font-semibold shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
                 >
-                  <p className="text-xs uppercase tracking-wide text-gray-500">{entry.label}</p>
-                  <p className="mt-1 text-sm font-semibold text-jira-gray break-words leading-snug line-clamp-2">
-                    {entry.value}
-                  </p>
-                </div>
-              ))}
-              {(quotations?.pdfAvailable || quotations?.pdfName) && (
-                <div className="border border-gray-100 rounded-xl p-2 bg-gray-50/80 h-20 flex flex-col overflow-hidden sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Generated PDF</p>
-                  <p className="mt-1 text-xs font-semibold text-jira-gray break-words leading-snug line-clamp-2">
-                    {quotations?.pdfName || 'Quotations.pdf'}
-                  </p>
-                  <div className="mt-auto flex items-center gap-3 text-jira-blue font-semibold text-xs">
-                    <button onClick={handleViewPdf} className="hover:underline">
-                      View
-                    </button>
-                    <button onClick={handleDownloadPdf} className="hover:underline">
-                      Download
-                    </button>
-                  </div>
-                </div>
-              )}
+                  <Send className="w-5 h-5" />
+                  <span>Send Notification</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {showSnapshotPanel && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-jira-gray">Quotations Snapshot</h3>
+                  <p className="text-sm text-gray-500">Latest inputs from the Quotations flow.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-jira-blue bg-blue-50 px-3 py-1 rounded-full">
+                    {quotationEntries.length} fields
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Send quotations"
+                    className="group relative inline-flex items-center justify-center w-12 h-12 rounded-full bg-jira-blue text-white shadow-lg hover:shadow-xl hover:bg-jira-blue-light transition focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
+                  >
+                    <span className="absolute -inset-1 rounded-full bg-jira-blue/25 blur-md opacity-60 group-hover:opacity-80 transition-opacity" />
+                    <Send className="relative w-5 h-5 paper-plane-float group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:rotate-12 transition-transform duration-300" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto pr-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {quotationEntries.map((entry) => (
+                    <div
+                      key={entry.key}
+                      className="border border-gray-100 rounded-xl p-2 bg-gray-50/80 h-20 flex flex-col overflow-hidden"
+                    >
+                      <p className="text-xs uppercase tracking-wide text-gray-500">{entry.label}</p>
+                      <p className="mt-1 text-sm font-semibold text-jira-gray break-words leading-snug line-clamp-2">
+                        {entry.value}
+                      </p>
+                    </div>
+                  ))}
+                  {(quotations?.pdfAvailable || quotations?.pdfName) && (
+                    <div className="border border-gray-100 rounded-xl p-2 bg-gray-50/80 h-20 flex flex-col overflow-hidden sm:col-span-2">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Generated PDF</p>
+                      <p className="mt-1 text-xs font-semibold text-jira-gray break-words leading-snug line-clamp-2">
+                        {quotations?.pdfName || 'Quotations.pdf'}
+                      </p>
+                      <div className="mt-auto flex items-center gap-3 text-jira-blue font-semibold text-xs">
+                        <button onClick={handleViewPdf} className="hover:underline">
+                          View
+                        </button>
+                        <button onClick={handleDownloadPdf} className="hover:underline">
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
