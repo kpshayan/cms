@@ -593,18 +593,50 @@ const Quotations = () => {
 
   const scrollIntoViewIfNeeded = (node, { padding = 24, behavior = 'smooth' } = {}) => {
     if (!node) return;
-    const rect = node.getBoundingClientRect();
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const getScrollParent = (el) => {
+      let current = el?.parentElement;
+      while (current) {
+        const style = window.getComputedStyle(current);
+        const overflowY = style.overflowY;
+        const isScrollable = (overflowY === 'auto' || overflowY === 'scroll') && current.scrollHeight > current.clientHeight;
+        if (isScrollable) return current;
+        current = current.parentElement;
+      }
+      return null;
+    };
 
-    const topOverflow = rect.top - padding;
-    const bottomOverflow = rect.bottom + padding - viewportHeight;
+    const scrollParent = getScrollParent(node);
 
-    if (topOverflow < 0) {
-      window.scrollBy({ top: topOverflow, behavior });
+    if (!scrollParent) {
+      const rect = node.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const topOverflow = rect.top - padding;
+      const bottomOverflow = rect.bottom + padding - viewportHeight;
+
+      if (topOverflow < 0) {
+        window.scrollBy({ top: topOverflow, behavior });
+        return;
+      }
+      if (bottomOverflow > 0) {
+        window.scrollBy({ top: bottomOverflow, behavior });
+      }
       return;
     }
-    if (bottomOverflow > 0) {
-      window.scrollBy({ top: bottomOverflow, behavior });
+
+    const parentRect = scrollParent.getBoundingClientRect();
+    const rect = node.getBoundingClientRect();
+    const visibleTop = parentRect.top + padding;
+    const visibleBottom = parentRect.bottom - padding;
+
+    if (rect.top < visibleTop) {
+      const delta = rect.top - visibleTop;
+      scrollParent.scrollTo({ top: scrollParent.scrollTop + delta, behavior });
+      return;
+    }
+
+    if (rect.bottom > visibleBottom) {
+      const delta = rect.bottom - visibleBottom;
+      scrollParent.scrollTo({ top: scrollParent.scrollTop + delta, behavior });
     }
   };
 
@@ -670,7 +702,9 @@ const Quotations = () => {
   const finalizeQuotations = async (entries) => {
     if (!projectId || isSaving) return;
     if (!project?.quotationDetailsFinalized) {
-      setSubmitError('Please finalize the details box before generating the PDF.');
+      const message = 'Please finalize the details box before generating the PDF.';
+      setSubmitError('');
+      setDetailsError(message);
 
       setDetailsNeedsAttention(true);
       if (detailsAttentionTimeoutRef.current) {
@@ -860,7 +894,13 @@ const Quotations = () => {
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="bg-white dark:bg-[var(--bg-surface)] border-2 border-jira-blue/15 dark:border-white/10 rounded-3xl p-8 shadow-xl">
           <div className="flex flex-col gap-8">
-            <div className="rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200/60 dark:border-white/10 p-4">
+            <div
+              ref={detailsBoxRef}
+              className={
+                'rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200/60 dark:border-white/10 p-4 transition ' +
+                (detailsNeedsAttention ? 'ring-2 ring-red-400 ring-offset-2 ring-offset-white dark:ring-offset-[var(--bg-surface)]' : '')
+              }
+            >
               <div className="flex items-center justify-between gap-4">
                 <p className="text-xs uppercase tracking-wide font-semibold text-jira-gray dark:text-white">Details</p>
                 {isEditingDetails ? (
@@ -1027,7 +1067,11 @@ const Quotations = () => {
                       <button
                         type="button"
                         disabled={isSaving}
-                        onClick={() => setIsFieldMenuOpen((prev) => !prev)}
+                        onClick={() => {
+                          setIsFieldMenuOpen((prev) => !prev);
+                          ensureServiceRowVisible();
+                        }}
+                        onFocus={ensureServiceRowVisible}
                         className="w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none text-left flex items-center justify-between gap-3"
                         aria-haspopup="listbox"
                         aria-expanded={isFieldMenuOpen}
@@ -1040,6 +1084,7 @@ const Quotations = () => {
                         <div
                           role="listbox"
                           tabIndex={-1}
+                          ref={fieldMenuPopupRef}
                           className="absolute left-0 right-0 mt-1.5 z-50 rounded-xl border border-gray-200 dark:border-[var(--border-color)] shadow-lg overflow-hidden bg-white/90 dark:bg-[var(--bg-surface)] backdrop-blur-md"
                         >
                           <div className="max-h-56 overflow-y-auto p-1.5">
@@ -1077,8 +1122,10 @@ const Quotations = () => {
                         onChange={(e) => {
                           const raw = e.target.value;
                           setCurrentValue(digitsOnly(raw));
+                          ensureServiceRowVisible();
                         }}
                         onKeyDown={handleKeyPress}
+                        onFocus={ensureServiceRowVisible}
                         inputMode="numeric"
                         pattern="[0-9]*"
                         className="w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none"
@@ -1091,7 +1138,11 @@ const Quotations = () => {
                       <input
                         type="text"
                         value={currentDuration}
-                        onChange={(e) => setCurrentDuration(e.target.value)}
+                        onChange={(e) => {
+                          setCurrentDuration(e.target.value);
+                          ensureServiceRowVisible();
+                        }}
+                        onFocus={ensureServiceRowVisible}
                         className="w-full h-14 px-5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl text-lg focus:outline-none"
                         placeholder="Enter duration"
                         disabled={isSaving}
@@ -1116,7 +1167,6 @@ const Quotations = () => {
               )}
 
               {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
-              {submitError && <p className="mt-2 text-sm text-red-500">{submitError}</p>}
             </div>
 
             <div className="py-8 text-center">
