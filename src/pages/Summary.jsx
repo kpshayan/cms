@@ -128,6 +128,9 @@ const Summary = () => {
     const target = location?.state?.scrollTo;
     if (target !== 'quotationsSnapshot') return;
 
+    // Wait until the snapshot panel is actually rendered (i.e., quotations loaded).
+    if (!showSnapshotPanel) return;
+
     handledScrollRef.current = true;
     requestAnimationFrame(() => {
       if (quotationsSnapshotRef.current) {
@@ -141,7 +144,7 @@ const Summary = () => {
         state: {},
       });
     });
-  }, [location, navigate]);
+  }, [location, navigate, showSnapshotPanel]);
 
   const ensureQuotationsBlob = async () => {
     if (quotations?.pdfBlob) {

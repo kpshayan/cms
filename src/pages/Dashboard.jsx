@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import ProjectsOverview from './ProjectsOverview';
@@ -12,15 +13,25 @@ import TaskDetails from './TaskDetails';
 import { useSidebar } from '../context/SidebarContext';
 
 const Dashboard = () => {
+  const location = useLocation();
+  const contentRef = useRef(null);
   const { collapsed } = useSidebar();
   const { user } = useAuth();
   const isAdminOne = user?.role === 'FULL_ACCESS';
+
+  useEffect(() => {
+    if (!contentRef.current) return;
+    contentRef.current.scrollTop = 0;
+  }, [location.pathname]);
   
   return (
     <div className="flex h-screen overflow-hidden bg-jira-bg dark:bg-[var(--bg-body)]">
       <Sidebar />
       
-      <div className={`flex-1 min-h-0 overflow-y-auto transition-all duration-500 ${collapsed ? 'ml-16' : 'ml-64'}`}>
+      <div
+        ref={contentRef}
+        className={`flex-1 min-h-0 overflow-y-auto transition-all duration-500 ${collapsed ? 'ml-16' : 'ml-64'}`}
+      >
         <Routes>
           {/* Dashboard Home */}
           <Route index element={<ProjectsOverview />} />
