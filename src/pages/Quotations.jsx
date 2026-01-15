@@ -738,7 +738,9 @@ const Quotations = () => {
       });
 
       clearDraft(projectId);
-      navigate(`/dashboard/project/${id}/summary`);
+      navigate(`/dashboard/project/${id}/summary`, {
+        state: { scrollTo: 'quotationsSnapshot' },
+      });
     } catch (err) {
       setSubmitError(err?.message || 'Unable to save quotations.');
     } finally {

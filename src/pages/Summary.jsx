@@ -1,5 +1,5 @@
-import { useParams } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Users, 
   CheckCircle2, 
@@ -21,6 +21,8 @@ import UserTasksModal from '../components/UserTasksModal';
 
 const Summary = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { 
     getProjectById, 
     getTasksByProject,
@@ -62,6 +64,9 @@ const Summary = () => {
   const [summaryCommentText, setSummaryCommentText] = useState('');
   const [submittingSummaryComment, setSubmittingSummaryComment] = useState(false);
   const [deletingSummaryCommentId, setDeletingSummaryCommentId] = useState(null);
+
+  const quotationsSnapshotRef = useRef(null);
+  const handledScrollRef = useRef(false);
 
   const completedTasks = tasks.filter(t => t.status === 'done').length;
   const inProgressTasks = tasks.filter(t => t.status === 'in-progress').length;
@@ -117,6 +122,26 @@ const Summary = () => {
     loadQuotationsForProject(projectId).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, isAdminOne]);
+
+  useEffect(() => {
+    if (handledScrollRef.current) return;
+    const target = location?.state?.scrollTo;
+    if (target !== 'quotationsSnapshot') return;
+
+    handledScrollRef.current = true;
+    requestAnimationFrame(() => {
+      if (quotationsSnapshotRef.current) {
+        quotationsSnapshotRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      navigate(`${location.pathname}${location.search}${location.hash}`, {
+        replace: true,
+        state: {},
+      });
+    });
+  }, [location, navigate]);
 
   const ensureQuotationsBlob = async () => {
     if (quotations?.pdfBlob) {
@@ -410,7 +435,11 @@ const Summary = () => {
           )}
 
           {showSnapshotPanel && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+            <div
+              ref={quotationsSnapshotRef}
+              id="quotations-snapshot"
+              className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col"
+            >
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-jira-gray">Quotations Snapshot</h3>
