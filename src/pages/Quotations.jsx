@@ -194,9 +194,15 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
       '/quotation-template/page1.jpg',
       '/quotation-template/page1.jpeg',
       '/quotation-template/page1.png.jpg',
+      '/quotation-template/page1.PNG',
+      '/quotation-template/page1.JPG',
+      '/quotation-template/page1.JPEG',
       '/quotation-template/pag1.png',
       '/quotation-template/pag1.jpg',
       '/quotation-template/pag1.jpeg',
+      '/quotation-template/pag1.PNG',
+      '/quotation-template/pag1.JPG',
+      '/quotation-template/pag1.JPEG',
     ]);
   } catch {
     templatePage1 = null;
@@ -208,9 +214,15 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
       '/quotation-template/page2.jpg',
       '/quotation-template/page2.jpeg',
       '/quotation-template/page2.png.jpg',
+      '/quotation-template/page2.PNG',
+      '/quotation-template/page2.JPG',
+      '/quotation-template/page2.JPEG',
       '/quotation-template/pag2.png',
       '/quotation-template/pag2.jpg',
       '/quotation-template/pag2.jpeg',
+      '/quotation-template/pag2.PNG',
+      '/quotation-template/pag2.JPG',
+      '/quotation-template/pag2.JPEG',
     ]);
   } catch {
     templatePage2 = null;
@@ -258,6 +270,12 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
         '/quotation-template/logo.png',
         '/quotation-template/logo.jpg',
         '/quotation-template/logo.jpeg',
+        '/quotation-template/logo.PNG',
+        '/quotation-template/logo.JPG',
+        '/quotation-template/logo.JPEG',
+          '/quotation-template/logo.PNG',
+          '/quotation-template/logo.JPG',
+          '/quotation-template/logo.JPEG',
       ]);
       const fmt = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
       doc.addImage(logoData, fmt, 14, 8, 22, 22);
