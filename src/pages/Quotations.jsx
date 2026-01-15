@@ -186,6 +186,46 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
   const orange = [244, 179, 81];
   const pageW = 210;
 
+  let templatePage1;
+  let templatePage2;
+  try {
+    templatePage1 = await fetchFirstAvailableAsDataUrl([
+      '/quotation-template/page1.png',
+      '/quotation-template/page1.jpg',
+      '/quotation-template/page1.jpeg',
+      '/quotation-template/page1.png.jpg',
+      '/quotation-template/pag1.png',
+      '/quotation-template/pag1.jpg',
+      '/quotation-template/pag1.jpeg',
+    ]);
+  } catch {
+    templatePage1 = null;
+  }
+
+  try {
+    templatePage2 = await fetchFirstAvailableAsDataUrl([
+      '/quotation-template/page2.png',
+      '/quotation-template/page2.jpg',
+      '/quotation-template/page2.jpeg',
+      '/quotation-template/page2.png.jpg',
+      '/quotation-template/pag2.png',
+      '/quotation-template/pag2.jpg',
+      '/quotation-template/pag2.jpeg',
+    ]);
+  } catch {
+    templatePage2 = null;
+  }
+
+  const hasTemplateBackground = Boolean(templatePage1);
+
+  const addTemplateBackground = (pageIndex) => {
+    if (!hasTemplateBackground) return;
+    const bg = pageIndex === 0 ? templatePage1 : (templatePage2 || templatePage1);
+    if (!bg) return;
+    const fmt = bg.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+    doc.addImage(bg, fmt, 0, 0, pageW, 297);
+  };
+
   const tableX = 12;
   const tableW = 186;
   const headerY = 122;
@@ -210,33 +250,37 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
   };
 
   const drawPageHeader = async ({ pageIndex }) => {
-    // --- Header band ---
-    doc.setFillColor(...navy);
-    doc.rect(0, 0, pageW, 38, 'F');
-    doc.setFillColor(255, 255, 255);
-    doc.ellipse(120, 40, 130, 34, 'F');
+    addTemplateBackground(pageIndex);
 
-    // Logo (optional): public/quotation-template/logo.png (or .jpg)
-    try {
-      const logoData = await fetchFirstAvailableAsDataUrl([
-        '/quotation-template/logo.png',
-        '/quotation-template/logo.jpg',
-        '/quotation-template/logo.jpeg',
-      ]);
-      const fmt = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-      doc.addImage(logoData, fmt, 14, 8, 22, 22);
-    } catch {
-      // ok
+    if (!hasTemplateBackground) {
+      // --- Header band ---
+      doc.setFillColor(...navy);
+      doc.rect(0, 0, pageW, 38, 'F');
+      doc.setFillColor(255, 255, 255);
+      doc.ellipse(120, 40, 130, 34, 'F');
+
+      // Logo (optional): public/quotation-template/logo.png (or .jpg)
+      try {
+        const logoData = await fetchFirstAvailableAsDataUrl([
+          '/quotation-template/logo.png',
+          '/quotation-template/logo.jpg',
+          '/quotation-template/logo.jpeg',
+        ]);
+        const fmt = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+        doc.addImage(logoData, fmt, 14, 8, 22, 22);
+      } catch {
+        // ok
+      }
+
+      // Company name (top-left)
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...gold);
+      doc.setFontSize(18);
+      doc.text('mayasabha', 40, 18);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text('STUDIOS', 42, 26);
     }
-
-    // Company name (top-left)
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...gold);
-    doc.setFontSize(18);
-    doc.text('mayasabha', 40, 18);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text('STUDIOS', 42, 26);
 
     // Top-right date
     doc.setFont('helvetica', 'bold');
@@ -244,33 +288,41 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
     doc.setFontSize(10);
     doc.text(issuedOn, 196, 52, { align: 'right' });
 
-    // Title
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(90, 90, 90);
-    doc.setFontSize(34);
-    doc.text('Quotation', 14, 66);
+    if (!hasTemplateBackground) {
+      // Title
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(90, 90, 90);
+      doc.setFontSize(34);
+      doc.text('Quotation', 14, 66);
 
-    // Quote number
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(120, 120, 120);
-    doc.setFontSize(12);
-    doc.text(`Quote No. ${quoteNo || '-'}`, 16, 76);
+      // Quote number
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(120, 120, 120);
+      doc.setFontSize(12);
+      doc.text(`Quote No. ${quoteNo || '-'}`, 16, 76);
 
-    // Left company details: keep unchanged (as per your template)
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...lightGray);
-    doc.setFontSize(11);
-    const leftX = 16;
-    let leftY = 84;
-    const leftLine = (text) => {
-      doc.text(text, leftX, leftY);
-      leftY += 6;
-    };
-    leftLine('P: +91 96666 38 123');
-    leftLine('E: info@mayasabhastudios.com');
-    leftLine('A: Flat No. 1-62/5/203-303, Kavuri Supreme Enclave,');
-    leftLine('   Kavuri Hills, Hyderabad 500033');
-    leftLine('GST No: 36AACCM7226P1Z0');
+      // Left company details: keep unchanged (as per your template)
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...lightGray);
+      doc.setFontSize(11);
+      const leftX = 16;
+      let leftY = 84;
+      const leftLine = (text) => {
+        doc.text(text, leftX, leftY);
+        leftY += 6;
+      };
+      leftLine('P: +91 96666 38 123');
+      leftLine('E: info@mayasabhastudios.com');
+      leftLine('A: Flat No. 1-62/5/203-303, Kavuri Supreme Enclave,');
+      leftLine('   Kavuri Hills, Hyderabad 500033');
+      leftLine('GST No: 36AACCM7226P1Z0');
+    } else {
+      // On background template, still overlay the quote number in its slot.
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(90, 90, 90);
+      doc.setFontSize(12);
+      doc.text(`Quote No. ${quoteNo || '-'}`, 16, 76);
+    }
 
     // Right block: Issued On + Issued To
     const blockX = 118;
@@ -306,15 +358,17 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
     line('Producer', details?.producer);
     line('Contact', details?.contact);
 
-    // Table header
-    doc.setFillColor(...orange);
-    doc.rect(tableX, headerY, tableW, headerH, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(80, 80, 80);
-    doc.setFontSize(11);
-    doc.text('Description', tableX + 55, headerY + 7, { align: 'center' });
-    doc.text('Duration', tableX + 112, headerY + 7, { align: 'center' });
-    doc.text('Amount (₹)', tableX + 170, headerY + 7, { align: 'center' });
+    if (!hasTemplateBackground) {
+      // Table header
+      doc.setFillColor(...orange);
+      doc.rect(tableX, headerY, tableW, headerH, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(11);
+      doc.text('Description', tableX + 55, headerY + 7, { align: 'center' });
+      doc.text('Duration', tableX + 112, headerY + 7, { align: 'center' });
+      doc.text('Amount (₹)', tableX + 170, headerY + 7, { align: 'center' });
+    }
 
     // (Optional) show page number if multiple pages
     if (pageIndex > 0) {
@@ -326,27 +380,43 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
   };
 
   const drawFooter = (startY) => {
-    const totalH = 12;
-    const wordsH = 10;
-
     const totalY = startY;
-    doc.setFillColor(...orange);
-    doc.rect(tableX, totalY, tableW, totalH, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(100, 100, 100);
-    doc.setFontSize(12);
-    doc.text('Total', tableX + 105, totalY + 8, { align: 'center' });
-    doc.text(`${formatIndianNumber(total)}/-`, tableX + 170, totalY + 8, { align: 'center' });
 
-    const wordsY = totalY + totalH;
-    doc.setFillColor(...orange);
-    doc.rect(tableX, wordsY, tableW, wordsH, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(90, 90, 90);
-    doc.setFontSize(11);
-    doc.text(`${(totalWords || '').trim()} Only`.trim(), tableX + 105, wordsY + 7, { align: 'center' });
+    if (!hasTemplateBackground) {
+      const totalH = 12;
+      const wordsH = 10;
 
-    const termsY = wordsY + wordsH + 18;
+      doc.setFillColor(...orange);
+      doc.rect(tableX, totalY, tableW, totalH, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(12);
+      doc.text('Total', tableX + 105, totalY + 8, { align: 'center' });
+      doc.text(`${formatIndianNumber(total)}/-`, tableX + 170, totalY + 8, { align: 'center' });
+
+      const wordsY = totalY + totalH;
+      doc.setFillColor(...orange);
+      doc.rect(tableX, wordsY, tableW, wordsH, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(90, 90, 90);
+      doc.setFontSize(11);
+      doc.text(`${(totalWords || '').trim()} Only`.trim(), tableX + 105, wordsY + 7, { align: 'center' });
+    } else {
+      // Background template already has the styling; overlay just the values.
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(12);
+      doc.text('Total', tableX + 105, totalY + 8, { align: 'center' });
+      doc.text(`${formatIndianNumber(total)}/-`, tableX + 170, totalY + 8, { align: 'center' });
+
+      const wordsY = totalY + 12;
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(11);
+      doc.text(`${(totalWords || '').trim()} Only`.trim(), tableX + 105, wordsY + 7, { align: 'center' });
+    }
+
+    const termsY = (hasTemplateBackground ? (startY + 12 + 10 + 18) : (startY + 12 + 10 + 18));
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(120, 120, 120);
     doc.setFontSize(12);
@@ -410,6 +480,14 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
     doc.text(`${formatIndianNumber(layout.amount)}/-`, amtX, y, { align: 'center' });
 
     y += layout.rowH;
+  }
+
+  // Ensure at least 2 pages for the final template (page 1 + page 2)
+  if (pageIndex === 0) {
+    doc.addPage();
+    pageIndex += 1;
+    await drawPageHeader({ pageIndex });
+    y = bodyStartY;
   }
 
   // Footer (totals + terms) on the last page
