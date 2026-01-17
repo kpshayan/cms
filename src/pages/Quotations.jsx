@@ -264,7 +264,7 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
   };
 
   const drawPageHeader = async ({ mode = 'content' } = {}) => {
-    // Page 1 only: draw background + all dynamic overlays.
+    // Page 1 only: draw background + overlays.
     addTemplateBackground(0);
 
     // Page-2 requirement: template-only page must not contain any dynamic overlays.
@@ -289,68 +289,38 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
       // ok
     }
 
-    if (!hasTemplateBackground) {
-      // --- Header band ---
-      doc.setFillColor(...navy);
-      doc.rect(0, 0, pageW, 38, 'F');
-      doc.setFillColor(255, 255, 255);
-      doc.ellipse(120, 40, 130, 34, 'F');
-
-      // Company name (top-left)
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...gold);
-      doc.setFontSize(18);
-      doc.text('mayasabha', 40, 18);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.text('STUDIOS', 42, 26);
-    }
-
-    // Top-right date
+    // Title
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(40, 40, 40);
-    doc.setFontSize(10);
-    doc.text(issuedOn, 196, 52, { align: 'right' });
+    doc.setTextColor(90, 90, 90);
+    doc.setFontSize(34);
+    doc.text('Quotation', 14, 66);
 
-    if (!hasTemplateBackground) {
-      // Title
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(90, 90, 90);
-      doc.setFontSize(34);
-      doc.text('Quotation', 14, 66);
+    // Quote number
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(120, 120, 120);
+    doc.setFontSize(12);
+    doc.text(`Quote No. ${quoteNo || '-'}`, 16, 76);
 
-      // Quote number
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(120, 120, 120);
-      doc.setFontSize(12);
-      doc.text(`Quote No. ${quoteNo || '-'}`, 16, 76);
+    // Left company details (styled like reference template)
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...lightGray);
+    doc.setFontSize(11);
+    const leftX = 16;
+    let leftY = 84;
+    const leftLine = (text) => {
+      doc.text(text, leftX, leftY);
+      leftY += 6;
+    };
+    leftLine('P: +91 96666 38 123');
+    leftLine('E: info@mayasabhastudios.com');
+    leftLine('A: Flat No. 1-62/5/203-303, Kavuri Supreme Enclave,');
+    leftLine('   Kavuri Hills, Hyderabad 500033');
+    leftLine('GST No: 36AACCM7226P1Z0');
 
-      // Left company details: keep unchanged (as per your template)
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(...lightGray);
-      doc.setFontSize(11);
-      const leftX = 16;
-      let leftY = 84;
-      const leftLine = (text) => {
-        doc.text(text, leftX, leftY);
-        leftY += 6;
-      };
-      leftLine('P: +91 96666 38 123');
-      leftLine('E: info@mayasabhastudios.com');
-      leftLine('A: Flat No. 1-62/5/203-303, Kavuri Supreme Enclave,');
-      leftLine('   Kavuri Hills, Hyderabad 500033');
-      leftLine('GST No: 36AACCM7226P1Z0');
-    } else {
-      // On background template, still overlay the quote number in its slot.
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(90, 90, 90);
-      doc.setFontSize(12);
-      doc.text(`Quote No. ${quoteNo || '-'}`, 16, 76);
-    }
-
-    // Right block: Issued On + Issued To
+    // Right block: ISSUED ON + ISSUED TO
     const blockX = 118;
-    const blockY = 68;
+    const blockY = 60;
+
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...gray);
     doc.setFontSize(11);
@@ -361,11 +331,11 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...gray);
-    doc.text('ISSUED TO', blockX, blockY + 8);
+    doc.text('ISSUED TO', blockX, blockY + 10);
 
     const labelX = blockX;
     const valueX = blockX + 32;
-    let y = blockY + 16;
+    let y = blockY + 18;
     const line = (label, value) => {
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(120, 120, 120);
@@ -382,57 +352,40 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
     line('Producer', details?.producer);
     line('Contact', details?.contact);
 
-    if (!hasTemplateBackground) {
-      // Table header
-      doc.setFillColor(...orange);
-      doc.rect(tableX, headerY, tableW, headerH, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(80, 80, 80);
-      doc.setFontSize(11);
-      doc.text('Description', tableX + 55, headerY + 7, { align: 'center' });
-      doc.text('Duration', tableX + 112, headerY + 7, { align: 'center' });
-      doc.text('Amount (₹)', tableX + 170, headerY + 7, { align: 'center' });
-    }
+    // Table header
+    doc.setFillColor(...orange);
+    doc.rect(tableX, headerY, tableW, headerH, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(11);
+    doc.text('Description', tableX + 55, headerY + 7, { align: 'center' });
+    doc.text('Duration', tableX + 112, headerY + 7, { align: 'center' });
+    doc.text('Amount (₹)', tableX + 170, headerY + 7, { align: 'center' });
 
     // Intentionally no page numbers: the output is a fixed 2-page PDF.
   };
 
   const drawFooter = (startY) => {
     const totalY = startY;
+    const totalH = 12;
+    const wordsH = 10;
 
-    if (!hasTemplateBackground) {
-      const totalH = 12;
-      const wordsH = 10;
+    // Total band + words band (match reference styling)
+    doc.setFillColor(...orange);
+    doc.rect(tableX, totalY, tableW, totalH, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(12);
+    doc.text('Total', tableX + 105, totalY + 8, { align: 'center' });
+    doc.text(`${formatIndianNumber(total)}/-`, tableX + 170, totalY + 8, { align: 'center' });
 
-      doc.setFillColor(...orange);
-      doc.rect(tableX, totalY, tableW, totalH, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(100, 100, 100);
-      doc.setFontSize(12);
-      doc.text('Total', tableX + 105, totalY + 8, { align: 'center' });
-      doc.text(`${formatIndianNumber(total)}/-`, tableX + 170, totalY + 8, { align: 'center' });
-
-      const wordsY = totalY + totalH;
-      doc.setFillColor(...orange);
-      doc.rect(tableX, wordsY, tableW, wordsH, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(90, 90, 90);
-      doc.setFontSize(11);
-      doc.text(`${(totalWords || '').trim()} Only`.trim(), tableX + 105, wordsY + 7, { align: 'center' });
-    } else {
-      // Background template already has the styling; overlay just the values.
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(12);
-      doc.text('Total', tableX + 105, totalY + 8, { align: 'center' });
-      doc.text(`${formatIndianNumber(total)}/-`, tableX + 170, totalY + 8, { align: 'center' });
-
-      const wordsY = totalY + 12;
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(11);
-      doc.text(`${(totalWords || '').trim()} Only`.trim(), tableX + 105, wordsY + 7, { align: 'center' });
-    }
+    const wordsY = totalY + totalH;
+    doc.setFillColor(...orange);
+    doc.rect(tableX, wordsY, tableW, wordsH, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(90, 90, 90);
+    doc.setFontSize(11);
+    doc.text(`${(totalWords || '').trim()} Only`.trim(), tableX + 105, wordsY + 7, { align: 'center' });
 
     const termsY = (hasTemplateBackground ? (startY + 12 + 10 + 18) : (startY + 12 + 10 + 18));
     doc.setFont('helvetica', 'bold');
