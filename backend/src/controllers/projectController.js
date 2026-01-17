@@ -87,6 +87,8 @@ const buildQuotationsResponse = (project, { includePdfData = false } = {}) => {
 
 const buildQuotationVersionsResponse = (project) => {
   const versions = Array.isArray(project?.quotationVersions) ? project.quotationVersions : [];
+  const latestVersionId = versions.length ? String(versions[versions.length - 1]._id) : '';
+  const hasCurrentPdf = Boolean(project?.quotations?.pdfData?.data?.length);
   return versions
     .slice()
     .sort((a, b) => {
@@ -98,7 +100,9 @@ const buildQuotationVersionsResponse = (project) => {
       id: version._id,
       generatedAt: version.generatedAt,
       pdfName: version.pdfName,
-      pdfAvailable: Boolean(version.pdfData?.data?.length),
+      // PDFs are stored only once on the current quotations record to avoid MongoDB 16MB limits.
+      // For the latest version, treat the current PDF as available.
+      pdfAvailable: Boolean(version.pdfData?.data?.length) || (hasCurrentPdf && String(version._id) === latestVersionId),
       fieldsCount: Array.isArray(version.entries) ? version.entries.length : 0,
     }));
 };
@@ -314,11 +318,6 @@ exports.saveProjectQuotations = asyncHandler(async (req, res) => {
       data: buffer,
       contentType: 'application/pdf',
     };
-
-    nextVersion.pdfData = {
-      data: buffer,
-      contentType: 'application/pdf',
-    };
   } else {
     project.quotations.pdfData = undefined;
   }
@@ -363,13 +362,16 @@ exports.streamProjectQuotationVersionPdf = asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'Quotation version not found.' });
   }
 
-  const pdfBuffer = version.pdfData?.data;
+  const latestVersionId = versions.length ? String(versions[versions.length - 1]._id) : '';
+  const isLatest = latestVersionId && latestVersionId === versionId;
+
+  const pdfBuffer = version.pdfData?.data || (isLatest ? project.quotations?.pdfData?.data : null);
   if (!pdfBuffer || !pdfBuffer.length) {
     return res.status(404).json({ error: 'Quotations PDF not found for this version.' });
   }
 
   const filename = version.pdfName || 'Quotations.pdf';
-  res.setHeader('Content-Type', version.pdfData?.contentType || 'application/pdf');
+  res.setHeader('Content-Type', version.pdfData?.contentType || project.quotations?.pdfData?.contentType || 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
   return res.send(pdfBuffer);
 });
