@@ -190,6 +190,9 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
   let templatePage2;
   try {
     templatePage1 = await fetchFirstAvailableAsDataUrl([
+      // Preferred template (new)
+      '/quotation-template/Mayasabha%20studios%20invoice%20template_page-0001.jpg',
+      '/quotation-template/Mayasabha studios invoice template_page-0001.jpg',
       '/quotation-template/page1.png',
       '/quotation-template/page1.jpg',
       '/quotation-template/page1.jpeg',
