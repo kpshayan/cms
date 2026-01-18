@@ -164,6 +164,14 @@ const fetchAsDataUrl = async (url) => {
   });
 };
 
+const estimateDataUrlBytes = (dataUrl) => {
+  const str = String(dataUrl || '');
+  const comma = str.indexOf(',');
+  if (comma === -1) return 0;
+  const base64Len = str.length - comma - 1;
+  return Math.floor((base64Len * 3) / 4);
+};
+
 const compressImageDataUrlToJpeg = async (dataUrl, {
   maxWidth = 2480, // ~A4 portrait @ 300 DPI width
   maxHeight = 3508, // ~A4 portrait @ 300 DPI height
@@ -205,6 +213,31 @@ const compressImageDataUrlToJpeg = async (dataUrl, {
   } catch {
     return input;
   }
+};
+
+const compressTemplateForPdf = async (dataUrl) => {
+  const original = String(dataUrl || '');
+  if (!original.startsWith('data:image/')) return original;
+
+  // Aim for smaller embedded backgrounds so storing the PDF in MongoDB stays under 16MB.
+  // Target per-page background size ~1.8MB (2 pages => ~3–4MB PDF typically).
+  const targetBytes = 1_800_000;
+
+  const presets = [
+    { maxWidth: 2480, maxHeight: 3508, quality: 0.9 },
+    { maxWidth: 2200, maxHeight: 3115, quality: 0.86 },
+    { maxWidth: 2000, maxHeight: 2830, quality: 0.82 },
+    { maxWidth: 1700, maxHeight: 2400, quality: 0.8 },
+  ];
+
+  let current = original;
+  for (const preset of presets) {
+    // eslint-disable-next-line no-await-in-loop
+    current = await compressImageDataUrlToJpeg(current, preset);
+    if (estimateDataUrlBytes(current) <= targetBytes) break;
+  }
+
+  return current;
 };
 
 const fetchFirstAvailableAsDataUrl = async (urls) => {
@@ -278,11 +311,11 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
   // Goal: keep final 2-page PDF around ~3–4 MB without visible quality loss.
   if (templatePage1) {
     // eslint-disable-next-line no-await-in-loop
-    templatePage1 = await compressImageDataUrlToJpeg(templatePage1, { maxWidth: 2480, maxHeight: 3508, quality: 0.9 });
+    templatePage1 = await compressTemplateForPdf(templatePage1);
   }
   if (templatePage2) {
     // eslint-disable-next-line no-await-in-loop
-    templatePage2 = await compressImageDataUrlToJpeg(templatePage2, { maxWidth: 2480, maxHeight: 3508, quality: 0.9 });
+    templatePage2 = await compressTemplateForPdf(templatePage2);
   }
 
   const hasTemplateBackground = Boolean(templatePage1);
@@ -406,15 +439,17 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
     line('Producer', details?.producer);
     line('Contact', details?.contact);
 
-    // Table header
+    // Table header (match reference spacing + align with columns)
     doc.setFillColor(...orange);
     doc.rect(tableX, headerY, tableW, headerH, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(80, 80, 80);
-    doc.setFontSize(11);
-    doc.text('Description', tableX + 55, headerY + 7, { align: 'center' });
-    doc.text('Duration', tableX + 112, headerY + 7, { align: 'center' });
-    doc.text('Amount (₹)', tableX + 170, headerY + 7, { align: 'center' });
+    doc.setFontSize(10.5);
+    const headerTextY = headerY + 8;
+    doc.text('Description', tableX + 55, headerTextY, { align: 'center' });
+    doc.text('Duration', tableX + 112, headerTextY, { align: 'center' });
+    // Built-in jsPDF fonts often miss the ₹ glyph; use a reliable label.
+    doc.text('Amount (Rs.)', tableX + 170, headerTextY, { align: 'center' });
 
     // Intentionally no page numbers: the output is a fixed 2-page PDF.
   };
@@ -439,7 +474,7 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(90, 90, 90);
     doc.setFontSize(11);
-    doc.text(`${(totalWords || '').trim()} Only`.trim(), tableX + 105, wordsY + 7, { align: 'center' });
+    doc.text(`${(totalWords || '').trim()} Only`.trim(), tableX + 105, wordsY + 8, { align: 'center' });
 
     const termsY = (hasTemplateBackground ? (startY + 12 + 10 + 18) : (startY + 12 + 10 + 18));
     doc.setFont('helvetica', 'bold');
@@ -491,7 +526,7 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
   await drawPageHeader({ mode: 'content' });
 
   const descX = tableX + 18;
-  const durX = tableX + 98;
+  const durX = tableX + 112;
   const amtX = tableX + 170;
   const rowIndexX = tableX + 8;
 
@@ -502,10 +537,11 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
   let y = bodyStartY;
   for (let i = 0; i < layouts.length; i += 1) {
     const { layout } = layouts[i];
-    doc.text(String(i + 1), rowIndexX, y);
-    doc.text(layout.descLines, descX, y);
-    doc.text(layout.durLines, durX, y, { align: 'center' });
-    doc.text(`${formatIndianNumber(layout.amount)}/-`, amtX, y, { align: 'center' });
+    const rowTextY = y + 4;
+    doc.text(String(i + 1), rowIndexX, rowTextY);
+    doc.text(layout.descLines, descX, rowTextY);
+    doc.text(layout.durLines, durX, rowTextY, { align: 'center' });
+    doc.text(`${formatIndianNumber(layout.amount)}/-`, amtX, rowTextY, { align: 'center' });
 
     y += layout.rowH;
   }
