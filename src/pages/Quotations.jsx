@@ -164,6 +164,49 @@ const fetchAsDataUrl = async (url) => {
   });
 };
 
+const compressImageDataUrlToJpeg = async (dataUrl, {
+  maxWidth = 2480, // ~A4 portrait @ 300 DPI width
+  maxHeight = 3508, // ~A4 portrait @ 300 DPI height
+  quality = 0.88,
+} = {}) => {
+  const input = String(dataUrl || '');
+  if (!input.startsWith('data:image/')) return input;
+  if (typeof document === 'undefined') return input;
+
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('Failed to decode image'));
+      el.src = input;
+    });
+
+    const srcW = Number(img.width) || 0;
+    const srcH = Number(img.height) || 0;
+    if (!srcW || !srcH) return input;
+
+    // Downscale only (never upscale).
+    const scale = Math.min(maxWidth / srcW, maxHeight / srcH, 1);
+    const dstW = Math.max(1, Math.round(srcW * scale));
+    const dstH = Math.max(1, Math.round(srcH * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = dstW;
+    canvas.height = dstH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return input;
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, dstW, dstH);
+
+    // Force JPEG for much smaller PDFs.
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch {
+    return input;
+  }
+};
+
 const fetchFirstAvailableAsDataUrl = async (urls) => {
   const list = Array.isArray(urls) ? urls.filter(Boolean) : [];
   let lastError;
@@ -229,6 +272,17 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
     ]);
   } catch {
     templatePage2 = null;
+  }
+
+  // Reduce PDF size by downscaling and JPEG-compressing background templates.
+  // Goal: keep final 2-page PDF around ~3–4 MB without visible quality loss.
+  if (templatePage1) {
+    // eslint-disable-next-line no-await-in-loop
+    templatePage1 = await compressImageDataUrlToJpeg(templatePage1, { maxWidth: 2480, maxHeight: 3508, quality: 0.9 });
+  }
+  if (templatePage2) {
+    // eslint-disable-next-line no-await-in-loop
+    templatePage2 = await compressImageDataUrlToJpeg(templatePage2, { maxWidth: 2480, maxHeight: 3508, quality: 0.9 });
   }
 
   const hasTemplateBackground = Boolean(templatePage1);
