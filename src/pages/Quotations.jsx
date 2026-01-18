@@ -865,11 +865,13 @@ const Quotations = () => {
     }
     setIsSaving(true);
     setSubmitError('');
+    let pdfBlob;
+    let pdfName;
     try {
-      const pdfBlob = await buildPdfBlob(entries);
+      pdfBlob = await buildPdfBlob(entries);
       const quoteNo = formatQuoteNo(project?.quotationDetails?.quoteNo || detailsDraft.quoteNo || '');
       const baseName = quoteNo || (project?.key || 'PROJECT').toUpperCase();
-      const pdfName = `${baseName}-Quotation.pdf`;
+      pdfName = `${baseName}-Quotation.pdf`;
       const pdfBase64 = await blobToBase64(pdfBlob);
       await saveQuotationsForProject(projectId, {
         entries,
@@ -884,6 +886,21 @@ const Quotations = () => {
         state: { scrollTo: 'quotationsSnapshot' },
       });
     } catch (err) {
+      // If saving fails (e.g., MongoDB 16MB limit), still allow the user to download/view the PDF.
+      if (pdfBlob) {
+        try {
+          const url = URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = pdfName || 'Quotation.pdf';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {
+          // ignore
+        }
+      }
       setSubmitError(err?.message || 'Unable to save quotations.');
     } finally {
       setIsSaving(false);
