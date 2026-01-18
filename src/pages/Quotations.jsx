@@ -446,7 +446,7 @@ const drawQuotationTemplate = async ({ doc, issuedOn, quoteNo, details, rows, to
     doc.setTextColor(80, 80, 80);
     doc.setFontSize(10.5);
     const headerTextY = headerY + 8;
-    doc.text('Description', tableX + 55, headerTextY, { align: 'center' });
+    doc.text('Description', tableX + 18, headerTextY); // Align left with values
     doc.text('Duration', tableX + 112, headerTextY, { align: 'center' });
     // Built-in jsPDF fonts often miss the ₹ glyph; use a reliable label.
     doc.text('Amount (Rs.)', tableX + 170, headerTextY, { align: 'center' });
