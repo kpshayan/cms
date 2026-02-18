@@ -31,6 +31,27 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.get('/api/warmup', (req, res) => {
+  res.json({ status: 'ok', warmed: true, timestamp: new Date().toISOString() });
+});
+
+app.get('/api/diag', (req, res) => {
+  const mongoose = require('mongoose');
+  res.json({
+    node: process.version,
+    env: {
+      NODE_ENV: process.env.NODE_ENV || null,
+      hasMONGODB_URI: Boolean(process.env.MONGODB_URI),
+      hasJWT_SECRET: Boolean(process.env.JWT_SECRET),
+      hasADMIN1_USERNAMES: Boolean(process.env.ADMIN1_USERNAMES),
+    },
+    db: {
+      readyState: mongoose.connection.readyState,
+      host: mongoose.connection.host || null,
+    },
+  });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
