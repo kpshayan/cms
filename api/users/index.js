@@ -68,6 +68,7 @@ module.exports = async function (context, req) {
 
     await runPipeline(expressReq, res, handlers);
   } catch (err) {
+    context.log.error('[users]', err?.message || err);
     sendError(res, err);
   }
 

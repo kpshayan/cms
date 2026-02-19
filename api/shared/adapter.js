@@ -1,4 +1,4 @@
-const { parseCookies, serializeCookie } = require('./cookies');
+const { parseCookies } = require('./cookies');
 
 const parseBody = (req) => {
   const toTextIfPossible = (value) => {
@@ -124,15 +124,8 @@ const createReqRes = (context, req) => {
       return this;
     },
     cookie(name, value, options = {}) {
-      const serialized = serializeCookie(name, value, options);
-      const existing = this.headers['Set-Cookie'];
-      if (!existing) {
-        this.headers['Set-Cookie'] = serialized;
-      } else if (Array.isArray(existing)) {
-        this.headers['Set-Cookie'] = [...existing, serialized];
-      } else {
-        this.headers['Set-Cookie'] = [existing, serialized];
-      }
+      if (!this._cookies) this._cookies = [];
+      this._cookies.push({ name, value: String(value ?? ''), options });
       return this;
     },
     clearCookie(name, options = {}) {
@@ -152,11 +145,46 @@ const finalizeResponse = (context, res) => {
   const body = res.body;
   const isBuffer = Buffer.isBuffer(body);
 
+  // Build Azure Functions native cookies array.
+  // Azure SWA managed functions do NOT reliably forward raw Set-Cookie headers,
+  // but context.res.cookies is the officially supported mechanism.
+  const normalizeSameSite = (v) => {
+    const s = String(v || 'Lax').toLowerCase();
+    if (s === 'none') return 'None';
+    if (s === 'strict') return 'Strict';
+    return 'Lax';
+  };
+
+  const cookies = (res._cookies || []).map(({ name, value, options }) => {
+    const entry = {
+      name,
+      value: String(value ?? ''),
+      path: options.path || '/',
+      httpOnly: Boolean(options.httpOnly),
+      secure: Boolean(options.secure),
+      sameSite: normalizeSameSite(options.sameSite),
+    };
+    if (options.maxAge != null) {
+      entry.maxAge = Math.max(0, Math.floor(options.maxAge / 1000));
+    }
+    if (options.expires) {
+      entry.expires = new Date(options.expires);
+    }
+    if (options.domain) {
+      entry.domain = options.domain;
+    }
+    return entry;
+  });
+
+  const headers = { ...res.headers };
+  delete headers['Set-Cookie'];
+
   context.res = {
     status: res.statusCode,
-    headers: res.headers,
+    headers,
     body,
     ...(isBuffer ? { isRaw: true } : {}),
+    ...(cookies.length ? { cookies } : {}),
   };
 };
 

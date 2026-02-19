@@ -20,6 +20,10 @@ module.exports = async function bootstrap() {
       }
       await ensureAccessGroups();
     } catch (err) {
+      // IMPORTANT: Reset initPromise so the next request retries
+      // instead of returning the cached failed promise forever.
+      initPromise = null;
+
       const message = err?.message || String(err);
       const wrapped = new Error(
         `API bootstrap failed (database/access groups). ${message} `

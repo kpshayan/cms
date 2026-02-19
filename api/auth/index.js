@@ -75,12 +75,12 @@ module.exports = async function (context, req) {
     }
 
     // POST /api/auth/executors
-    if (method === 'POST' && segments[0] === 'executors') {
+    if (method === 'POST' && segments[0] === 'executors' && segments.length === 1) {
       handlers = [authenticate, requireAdmin1, authController.createExecutor];
     }
 
     // PATCH /api/auth/executors/:username
-    if (method === 'PATCH' && segments[0] === 'executors' && segments[1]) {
+    if (method === 'PATCH' && segments[0] === 'executors' && segments[1] && segments.length === 2) {
       expressReq.params.username = segments[1];
       handlers = [authenticate, requireAdmin1, authController.updateExecutor];
     }
@@ -92,7 +92,7 @@ module.exports = async function (context, req) {
     }
 
     // DELETE /api/auth/executors/:username
-    if (method === 'DELETE' && segments[0] === 'executors' && segments[1]) {
+    if (method === 'DELETE' && segments[0] === 'executors' && segments[1] && segments.length === 2) {
       expressReq.params.username = segments[1];
       handlers = [authenticate, requireAdmin1, authController.deleteExecutor];
     }
@@ -102,10 +102,9 @@ module.exports = async function (context, req) {
       return finalizeResponse(context, res);
     }
 
-    await runPipeline(expressReq, res, [
-      ...handlers.map((fn) => async (req2, res2, next) => fn(req2, res2, next)),
-    ]);
+    await runPipeline(expressReq, res, handlers);
   } catch (err) {
+    context.log.error('[auth]', err?.message || err);
     sendError(res, err);
   }
 

@@ -3,13 +3,11 @@ name: Azure Static Web Apps CI/CD
 on:
   push:
     branches:
-      - main
-      - azure-version
+      - azure-final-version
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches:
-      - main
-      - azure-version
+      - azure-final-version
 
 jobs:
   build_and_deploy_job:
@@ -32,8 +30,6 @@ jobs:
           api_location: api
           output_location: dist
           app_build_command: npm run build
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
