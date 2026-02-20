@@ -1,7 +1,8 @@
 node_modules
-dist
-dist-ssr
-*.local
+local.settings.json
+.env
+tmp.txt
+tmp_cookiejar.txt
 
 # Environment files (never commit secrets)
 .env

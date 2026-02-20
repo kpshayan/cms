@@ -1,0 +1,11 @@
+Put your quotation template background images here (high resolution, A4 portrait).
+
+Required filenames (recommended PNG):
+- page1.png  (the first page template with logo/colors/left-side company details)
+- page2.png  (the second page template (terms & conditions page))
+
+These files will be used by the PDF generator at runtime:
+- /quotation-template/page1.png
+- /quotation-template/page2.png
+
+After adding them, redeploy and the generated PDF will match your template.
