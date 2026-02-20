@@ -5,8 +5,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "dataType": "string",
-      "methods": ["get", "post", "put", "patch", "delete", "options"],
+      "methods": ["get", "post", "put", "delete", "options"],
       "route": "auth/{*path}"
     },
     {
