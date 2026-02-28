@@ -92,8 +92,6 @@ const Summary = () => {
   ].some((value) => String(value || '').trim());
 
   const showDetailsPanel = hasQuotationDetails;
-  const showVersionsPanel = isAdminOne && sortedQuotationVersions.length > 0;
-  const topPanelsCols = showDetailsPanel && showVersionsPanel ? 'lg:grid-cols-2' : 'lg:grid-cols-1';
 
   const quotationVersions = Array.isArray(project?.quotationVersions) ? project.quotationVersions : [];
   const sortedQuotationVersions = quotationVersions
@@ -103,6 +101,10 @@ const Summary = () => {
       const bTime = b?.generatedAt ? new Date(b.generatedAt).getTime() : 0;
       return bTime - aTime;
     });
+
+  const showVersionsPanel = isAdminOne && sortedQuotationVersions.length > 0;
+  const topPanelsCols = showDetailsPanel && showVersionsPanel ? 'lg:grid-cols-2' : 'lg:grid-cols-1';
+
   const olderQuotationVersions = sortedQuotationVersions.length > 1
     ? sortedQuotationVersions.slice(1)
     : [];
