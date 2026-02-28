@@ -295,10 +295,11 @@ exports.saveProjectQuotations = asyncHandler(async (req, res) => {
   project.quotations.generatedAt = generatedAt ? new Date(generatedAt) : new Date();
   project.quotationVersions = Array.isArray(project.quotationVersions) ? project.quotationVersions : [];
   const nextVersionNumber = project.quotationVersions.length + 1;
-  const baseName = `${String(project.key || 'PROJECT').toUpperCase()}-Quotations`;
-  const versionedPdfName = nextVersionNumber === 1
-    ? `${baseName}-Version.pdf`
-    : `${baseName}-Version ${nextVersionNumber}.pdf`;
+  const now = new Date();
+  const YY = String(now.getFullYear()).slice(-2);
+  const MM = String(now.getMonth() + 1).padStart(2, '0');
+  const NNN = String(nextVersionNumber).padStart(3, '0');
+  const versionedPdfName = `MSBQ${YY}${MM}${NNN}.pdf`;
   project.quotations.pdfName = versionedPdfName;
 
   const nextVersion = {

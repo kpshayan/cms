@@ -92,8 +92,8 @@ const Summary = () => {
   ].some((value) => String(value || '').trim());
 
   const showDetailsPanel = hasQuotationDetails;
-  const showSnapshotPanel = isAdminOne && hasQuotations;
-  const topPanelsCols = showDetailsPanel && showSnapshotPanel ? 'lg:grid-cols-2' : 'lg:grid-cols-1';
+  const showVersionsPanel = isAdminOne && sortedQuotationVersions.length > 0;
+  const topPanelsCols = showDetailsPanel && showVersionsPanel ? 'lg:grid-cols-2' : 'lg:grid-cols-1';
 
   const quotationVersions = Array.isArray(project?.quotationVersions) ? project.quotationVersions : [];
   const sortedQuotationVersions = quotationVersions
@@ -128,8 +128,8 @@ const Summary = () => {
     const target = location?.state?.scrollTo;
     if (target !== 'quotationsSnapshot') return;
 
-    // Wait until the snapshot panel is actually rendered (i.e., quotations loaded).
-    if (!showSnapshotPanel) return;
+    // Wait until the versions panel is actually rendered (i.e., quotations loaded).
+    if (!showVersionsPanel) return;
 
     handledScrollRef.current = true;
     requestAnimationFrame(() => {
@@ -144,7 +144,7 @@ const Summary = () => {
         state: {},
       });
     });
-  }, [location, navigate, showSnapshotPanel]);
+  }, [location, navigate, showVersionsPanel]);
 
   const ensureQuotationsBlob = async () => {
     if (quotations?.pdfBlob) {
@@ -405,7 +405,7 @@ const Summary = () => {
         />
       </div>
 
-      {(showDetailsPanel || showSnapshotPanel) && (
+      {(showDetailsPanel || showVersionsPanel) && (
         <div className={`grid grid-cols-1 ${topPanelsCols} gap-6 mb-8 items-stretch`}>
           {showDetailsPanel && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
@@ -437,61 +437,49 @@ const Summary = () => {
             </div>
           )}
 
-          {showSnapshotPanel && (
+          {showVersionsPanel && (
             <div
               ref={quotationsSnapshotRef}
-              id="quotations-snapshot"
+              id="pdf-versions"
               className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col"
             >
               <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-jira-gray">Quotations Snapshot</h3>
-                  <p className="text-sm text-gray-500">Latest inputs from the Quotations flow.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-semibold text-jira-blue bg-blue-50 px-3 py-1 rounded-full">
-                    {quotationEntries.length} fields
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Send quotations"
-                    className="group relative inline-flex items-center justify-center w-12 h-12 rounded-full bg-jira-blue text-white shadow-lg hover:shadow-xl hover:bg-jira-blue-light transition focus:outline-none focus:ring-2 focus:ring-jira-blue/30"
-                  >
-                    <span className="absolute -inset-1 rounded-full bg-jira-blue/25 blur-md opacity-60 group-hover:opacity-80 transition-opacity" />
-                    <Send className="relative w-5 h-5 paper-plane-float group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:rotate-12 transition-transform duration-300" />
-                  </button>
-                </div>
+                <h3 className="text-xl font-bold text-jira-gray">PDF Versions</h3>
+                <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                  {sortedQuotationVersions.length} version{sortedQuotationVersions.length === 1 ? '' : 's'}
+                </span>
               </div>
-              <div className="flex-1 overflow-y-auto pr-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {quotationEntries.map((entry) => (
-                    <div
-                      key={entry.key}
-                      className="border border-gray-100 rounded-xl p-2 bg-gray-50/80 h-20 flex flex-col overflow-hidden"
-                    >
-                      <p className="text-xs uppercase tracking-wide text-gray-500">{entry.label}</p>
-                      <p className="mt-1 text-sm font-semibold text-jira-gray break-words leading-snug line-clamp-2">
-                        {entry.value}
-                      </p>
-                    </div>
-                  ))}
-                  {(quotations?.pdfAvailable || quotations?.pdfName) && (
-                    <div className="border border-gray-100 rounded-xl p-2 bg-gray-50/80 h-20 flex flex-col overflow-hidden sm:col-span-2">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Generated PDF</p>
-                      <p className="mt-1 text-xs font-semibold text-jira-gray break-words leading-snug line-clamp-2">
-                        {quotations?.pdfName || 'Quotations.pdf'}
-                      </p>
-                      <div className="mt-auto flex items-center gap-3 text-jira-blue font-semibold text-xs">
-                        <button onClick={handleViewPdf} className="hover:underline">
+              <div className="flex-1 overflow-y-auto space-y-3">
+                {sortedQuotationVersions.map((version) => (
+                  <div key={version.id} className="border border-gray-100 rounded-2xl p-4 bg-gray-50/60">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-jira-gray truncate">{version.pdfName || 'Quotations.pdf'}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {version.generatedAt ? new Date(version.generatedAt).toLocaleString() : 'Unknown date'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 text-jira-blue font-semibold text-sm">
+                        <button
+                          type="button"
+                          onClick={() => handleViewOldVersion(version)}
+                          className="hover:underline"
+                          disabled={!version.pdfAvailable}
+                        >
                           View
                         </button>
-                        <button onClick={handleDownloadPdf} className="hover:underline">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadOldVersion(version)}
+                          className="hover:underline"
+                          disabled={!version.pdfAvailable}
+                        >
                           Download
                         </button>
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -568,64 +556,7 @@ const Summary = () => {
             </div>
           )}
 
-          {isAdminOne && olderQuotationVersions.length > 0 && (
-            <div className="mt-8 pt-6 border-t border-gray-100">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-jira-gray">Older Quotation Versions</h3>
-                  <p className="text-sm text-gray-500">Previous PDFs (latest stays above).</p>
-                </div>
-                <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                  {olderQuotationVersions.length} version{olderQuotationVersions.length === 1 ? '' : 's'}
-                </span>
-              </div>
 
-              <div className="space-y-3">
-                {visibleOlderQuotationVersions.map((version) => (
-                  <div key={version.id} className="border border-gray-100 rounded-2xl p-4 bg-gray-50/60">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-jira-gray truncate">{version.pdfName || 'Quotations.pdf'}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {version.generatedAt ? new Date(version.generatedAt).toLocaleString() : 'Unknown date'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4 text-jira-blue font-semibold">
-                        <button
-                          type="button"
-                          onClick={() => handleViewOldVersion(version)}
-                          className="hover:underline"
-                          disabled={!version.pdfAvailable}
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadOldVersion(version)}
-                          className="hover:underline"
-                          disabled={!version.pdfAvailable}
-                        >
-                          Download
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {olderQuotationVersions.length > 2 && (
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowAllQuotationVersions((prev) => !prev)}
-                    className="text-sm text-jira-blue hover:underline font-semibold"
-                  >
-                    {showAllQuotationVersions ? 'View less' : 'View more'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="space-y-6">
