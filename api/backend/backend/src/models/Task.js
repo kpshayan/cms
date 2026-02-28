@@ -27,7 +27,7 @@ const commentSchema = new mongoose.Schema({
 const taskSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
-  status: { type: String, enum: ['todo', 'in-progress', 'hold', 'done'], default: 'todo' },
+  status: { type: String, enum: ['todo', 'in-progress', 'hold', 'submitted', 'closed'], default: 'todo' },
   priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
   type: { type: String, enum: ['task', 'story', 'bug'], default: 'task' },
   project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },

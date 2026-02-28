@@ -34,8 +34,9 @@ const Board = () => {
   const columns = [
     { id: 'todo', title: 'To Do', status: 'todo', color: 'border-gray-300 dark:border-slate-600/70' },
     { id: 'in-progress', title: 'In Progress', status: 'in-progress', color: 'border-orange-300 dark:border-orange-500/70' },
-    { id: 'hold', title: 'Hold', status: 'hold', color: 'border-yellow-300 dark:border-yellow-400/70' },
-    { id: 'done', title: 'Done', status: 'done', color: 'border-green-300 dark:border-emerald-500/70' }
+    { id: 'hold', title: 'On Hold', status: 'hold', color: 'border-yellow-300 dark:border-yellow-400/70' },
+    { id: 'submitted', title: 'Submitted', status: 'submitted', color: 'border-purple-300 dark:border-purple-500/70' },
+    { id: 'closed', title: 'Closed', status: 'closed', color: 'border-green-300 dark:border-emerald-500/70' }
   ];
 
   const getTaskId = (task) => task?._id || task?.id;

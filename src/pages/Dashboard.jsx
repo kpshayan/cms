@@ -44,7 +44,7 @@ const Dashboard = () => {
             <>
               <Header />
               <Routes>
-                <Route index element={<Navigate to="summary" replace />} />
+                <Route index element={<Navigate to={isAdminOne ? "summary" : "backlog"} replace />} />
                 <Route path="summary" element={<Summary />} />
                 <Route path="backlog" element={<Backlog />} />
                 <Route path="board" element={<Board />} />

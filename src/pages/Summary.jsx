@@ -68,7 +68,8 @@ const Summary = () => {
   const quotationsSnapshotRef = useRef(null);
   const handledScrollRef = useRef(false);
 
-  const completedTasks = tasks.filter(t => t.status === 'done').length;
+  const submittedTasks = tasks.filter(t => t.status === 'submitted').length;
+  const closedTasks = tasks.filter(t => t.status === 'closed').length;
   const inProgressTasks = tasks.filter(t => t.status === 'in-progress').length;
   const holdTasks = tasks.filter(t => t.status === 'hold').length;
   const todoTasks = tasks.filter(t => t.status === 'todo').length;
@@ -376,7 +377,7 @@ const Summary = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6 mb-6">
         <StatCard
           icon={Activity}
           title="To Do"
@@ -399,10 +400,17 @@ const Summary = () => {
           color="bg-gradient-to-br from-gray-500 to-gray-600"
         />
         <StatCard
+          icon={TrendingUp}
+          title="Submitted"
+          value={submittedTasks}
+          subtitle="Pending review"
+          color="bg-gradient-to-br from-purple-500 to-purple-600"
+        />
+        <StatCard
           icon={CheckCircle2}
-          title="Done"
-          value={completedTasks}
-          subtitle="Finished"
+          title="Closed"
+          value={closedTasks}
+          subtitle="Completed"
           color="bg-gradient-to-br from-green-500 to-green-600"
         />
       </div>

@@ -9,7 +9,8 @@ const chipClass = {
     'todo': 'bg-gray-100 text-gray-700 border border-gray-200 dark:bg-white/5 dark:text-[var(--text-secondary)] dark:border-white/10',
     'in-progress': 'bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-500/20 dark:text-orange-200 dark:border-orange-500/40',
     'hold': 'bg-yellow-100 text-yellow-700 border border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-200 dark:border-yellow-500/40',
-    'done': 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-200 dark:border-green-500/40'
+    'submitted': 'bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/20 dark:text-purple-200 dark:border-purple-500/40',
+    'closed': 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-200 dark:border-green-500/40'
   },
   priority: {
     'low': 'bg-gray-100 text-gray-700 border border-gray-200 dark:bg-white/5 dark:text-[var(--text-secondary)] dark:border-white/10',

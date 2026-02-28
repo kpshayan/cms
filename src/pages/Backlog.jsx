@@ -44,12 +44,13 @@ const Backlog = () => {
   }, [projectTasks]);
 
   const statusSummary = useMemo(() => {
-    const tally = { todo: 0, inProgress: 0, hold: 0, done: 0 };
+    const tally = { todo: 0, inProgress: 0, hold: 0, submitted: 0, closed: 0 };
     projectTasks.forEach((task) => {
       const status = task?.status || 'todo';
       if (status === 'in-progress') tally.inProgress += 1;
       else if (status === 'hold') tally.hold += 1;
-      else if (status === 'done') tally.done += 1;
+      else if (status === 'submitted') tally.submitted += 1;
+      else if (status === 'closed') tally.closed += 1;
       else tally.todo += 1;
     });
     return tally;
@@ -153,7 +154,8 @@ const Backlog = () => {
           {task.priority}
         </span>
         <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${
-          task.status === 'done' ? 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-200 dark:border-green-500/50' :
+          task.status === 'closed' ? 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-200 dark:border-green-500/50' :
+          task.status === 'submitted' ? 'bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/20 dark:text-purple-200 dark:border-purple-500/50' :
           task.status === 'in-progress' ? 'bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-500/20 dark:text-orange-200 dark:border-orange-500/50' :
           task.status === 'hold' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-200 dark:border-yellow-500/50' :
           'bg-gray-100 text-gray-700 border border-gray-200 dark:bg-white/5 dark:text-[var(--text-secondary)] dark:border-white/10'
@@ -215,7 +217,8 @@ const Backlog = () => {
             <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-white/5 dark:text-white/80">To Do · {statusSummary.todo}</span>
             <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-100">In Progress · {statusSummary.inProgress}</span>
             <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-100">On Hold · {statusSummary.hold}</span>
-            <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-100">Done · {statusSummary.done}</span>
+            <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-100">Submitted · {statusSummary.submitted}</span>
+            <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-100">Closed · {statusSummary.closed}</span>
           </div>
         </div>
 

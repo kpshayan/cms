@@ -443,8 +443,9 @@ const TaskModal = ({ isOpen, onClose, task = null, projectId }) => {
           >
             <option value="todo">To Do</option>
             <option value="in-progress">In Progress</option>
-            <option value="hold">Hold</option>
-            <option value="done">Done</option>
+            <option value="hold">On Hold</option>
+            <option value="submitted">Submitted</option>
+            <option value="closed">Closed</option>
           </select>
         </div>
 
