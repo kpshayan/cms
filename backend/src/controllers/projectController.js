@@ -138,15 +138,24 @@ exports.getProject = asyncHandler(async (req, res) => {
 });
 
 exports.createProject = asyncHandler(async (req, res) => {
+  const year = new Date().getFullYear();
+  const count = await Project.countDocuments();
+  let seq = count + 1;
+  let generatedKey;
+  do {
+    generatedKey = `MSB${year}${String(seq).padStart(3, '0')}`;
+    seq += 1;
+  } while (await Project.exists({ key: generatedKey }));
+
   const payload = {
     name: req.body.name,
     description: req.body.description,
     color: req.body.color || '#2563eb',
-    key: (req.body.key || '').trim().toUpperCase(),
+    key: generatedKey,
   };
 
-  if (!payload.name || !payload.key) {
-    return res.status(400).json({ error: 'Project name and key are required.' });
+  if (!payload.name) {
+    return res.status(400).json({ error: 'Project name is required.' });
   }
 
   const project = await Project.create(payload);

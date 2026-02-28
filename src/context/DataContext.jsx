@@ -266,60 +266,24 @@ export const DataProvider = ({ children }) => {
     };
   }, [user]);
 
-  const generateUniqueProjectKey = (projectName) => {
-    const sanitizedName = (projectName || 'Project')
-      .replace(/[^a-zA-Z0-9\s]/g, ' ')
-      .toUpperCase()
-      .trim();
-
-    const words = sanitizedName.split(/\s+/).filter(Boolean);
-    let baseKey = words.slice(0, 3).map(word => word[0]).join('');
-
-    if (baseKey.length < 3) {
-      const condensed = sanitizedName.replace(/\s+/g, '');
-      baseKey = (baseKey + condensed).slice(0, 3);
-    }
-
-    if (baseKey.length < 3) {
-      baseKey = 'PRJ';
-    }
-
+  const generateUniqueProjectKey = () => {
+    const year = new Date().getFullYear();
     const existingKeys = new Set(
-      projects
-        .map(p => (p.key || '').toUpperCase())
-        .filter(Boolean)
+      projects.map(p => (p.key || '').toUpperCase()).filter(Boolean)
     );
-
-    if (!existingKeys.has(baseKey)) {
-      return baseKey;
-    }
-
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const buildSuffix = () => Array
-      .from({ length: 2 }, () => alphabet[Math.floor(Math.random() * alphabet.length)])
-      .join('');
-
-    let attempts = 0;
-    while (attempts < 50) {
-      const candidate = `${baseKey}${buildSuffix()}`.slice(0, 5);
-      if (!existingKeys.has(candidate)) {
-        return candidate;
-      }
-      attempts += 1;
-    }
-
-    let fallback = `${baseKey}${Date.now().toString().slice(-2)}`.slice(0, 5);
-    while (existingKeys.has(fallback)) {
-      fallback = `${baseKey}${Math.floor(Math.random() * 100)}`.slice(0, 5);
-    }
-
-    return fallback.toUpperCase();
+    let seq = projects.length + 1;
+    let candidate;
+    do {
+      candidate = `MSB${year}${String(seq).padStart(3, '0')}`;
+      seq += 1;
+    } while (existingKeys.has(candidate));
+    return candidate;
   };
 
   // Project operations
   const addProject = async (project) => {
     ensurePermission('manageProjects', 'You are not allowed to create projects.');
-    const projectKey = generateUniqueProjectKey(project.name);
+    const projectKey = generateUniqueProjectKey();
     try {
       const newProject = await projectAPI.create({
         name: project.name,
