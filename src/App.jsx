@@ -5,7 +5,6 @@ import { DataProvider } from './context/DataContext';
 import { SidebarProvider } from './context/SidebarContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import MagneticCursor from './components/MagneticCursor';
 import ThemeToggle from './components/ThemeToggle';
 import { warmupAPI } from './services/api';
 import Home from './pages/Home';
@@ -25,7 +24,6 @@ function AppShell() {
     <AuthProvider>
       <DataProvider>
         <SidebarProvider>
-          <MagneticCursor />
           <ThemeToggle />
           <BrowserRouter
             future={{
