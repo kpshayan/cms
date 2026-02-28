@@ -52,7 +52,7 @@ const Dashboard = () => {
                   <Route path="quotations" element={<Quotations />} />
                 )}
                 <Route path="tasks/:taskId" element={<TaskDetails />} />
-                <Route path="*" element={<Navigate to="summary" replace />} />
+                <Route path="*" element={<Navigate to={isAdminOne ? "summary" : "backlog"} replace />} />
               </Routes>
             </>
           } />

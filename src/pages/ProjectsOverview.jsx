@@ -13,12 +13,14 @@ const ProjectsOverview = () => {
   const [editingProject, setEditingProject] = useState(null);
   const [activeMenu, setActiveMenu] = useState(null);
   const canManageProjects = hasPermission('manageProjects');
+  const isAdminOne = user?.role === 'FULL_ACCESS';
+  const defaultProjectPage = isAdminOne ? 'summary' : 'backlog';
 
   const getProjectStats = (projectId) => {
     const tasks = getTasksByProject(projectId);
     return {
       total: tasks.length,
-      completed: tasks.filter(t => t.status === 'done').length,
+      completed: tasks.filter(t => t.status === 'closed' || t.status === 'submitted').length,
       inProgress: tasks.filter(t => t.status === 'in-progress').length,
       todo: tasks.filter(t => t.status === 'todo').length
     };
@@ -123,7 +125,7 @@ const ProjectsOverview = () => {
                       <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full" style={{ backgroundColor: projectColor, animation: 'pulse 3s ease-in-out infinite' }}></div>
                     </div>
                     <Link
-                      to={`/dashboard/project/${projectId}/summary`}
+                      to={`/dashboard/project/${projectId}/${defaultProjectPage}`}
                       className="flex items-center space-x-3 flex-1 z-10"
                     >
                       <div
@@ -188,7 +190,7 @@ const ProjectsOverview = () => {
                   {/* Project Content */}
                   <div className="overflow-hidden rounded-b-2xl">
                     <Link
-                      to={`/dashboard/project/${projectId}/summary`}
+                      to={`/dashboard/project/${projectId}/${defaultProjectPage}`}
                       className="block p-6"
                     >
                     <p className="text-gray-600 text-sm mb-6 line-clamp-2 group-hover:text-gray-800 transition-colors duration-300 dark:text-gray-300 dark:group-hover:text-gray-100">
