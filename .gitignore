@@ -20,3 +20,5 @@ backend/.env
 *.njsproj
 *.sln
 *.sw?
+
+*.zip
