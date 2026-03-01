@@ -491,6 +491,12 @@ export const DataProvider = ({ children }) => {
         )));
       }
 
+      // Refresh tasks so backend-created quotation tasks appear in the local state
+      try {
+        const freshTasks = await taskAPI.getAll();
+        setTasks(freshTasks || []);
+      } catch (_) { /* non-critical */ }
+
       return upsertQuotationsState(projectId, {
         entries: response?.entries || payload.entries || [],
         generatedAt: response?.generatedAt || payload.generatedAt,
