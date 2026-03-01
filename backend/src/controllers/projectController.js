@@ -335,6 +335,42 @@ exports.saveProjectQuotations = asyncHandler(async (req, res) => {
   project.quotationVersions.push(nextVersion);
 
   await project.save();
+
+  // Sync quotation tasks in backlog
+  const projectIdStr = String(project._id);
+  const existingQuotationTasks = await Task.find({
+    projectId: projectIdStr,
+    quotationKey: { $exists: true, $ne: null },
+  });
+  const existingByKey = {};
+  for (const t of existingQuotationTasks) {
+    existingByKey[t.quotationKey] = t;
+  }
+  const newKeys = new Set(entries.map((e) => e.key).filter(Boolean));
+  // Delete tasks whose quotation item was removed
+  const toDelete = existingQuotationTasks
+    .filter((t) => !newKeys.has(t.quotationKey))
+    .map((t) => t._id);
+  if (toDelete.length) {
+    await Task.deleteMany({ _id: { $in: toDelete } });
+  }
+  // Create tasks for new quotation items
+  for (const entry of entries) {
+    if (!entry.key || existingByKey[entry.key]) continue;
+    await Task.create({
+      title: entry.label || entry.key,
+      description: '',
+      status: 'todo',
+      priority: 'medium',
+      type: 'task',
+      project: project._id,
+      projectKey: project.key,
+      projectId: projectIdStr,
+      assignee: null,
+      quotationKey: entry.key,
+    });
+  }
+
   return res.json({
     ...buildQuotationsResponse(project),
     quotationVersions: buildQuotationVersionsResponse(project),

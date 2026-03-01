@@ -36,6 +36,7 @@ const taskSchema = new mongoose.Schema({
   attachments: { type: [attachmentSchema], default: [] },
   comments: { type: [commentSchema], default: [] },
   assignee: { type: assigneeSchema, default: null },
+  quotationKey: { type: String, default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Task', taskSchema);
