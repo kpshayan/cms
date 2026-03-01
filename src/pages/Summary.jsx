@@ -459,21 +459,31 @@ const Summary = () => {
                   {sortedQuotationVersions.length} version{sortedQuotationVersions.length === 1 ? '' : 's'}
                 </span>
               </div>
-              <div className="flex-1 overflow-y-auto space-y-3">
-                {sortedQuotationVersions.map((version) => (
-                  <div key={version.id} className="border border-gray-100 rounded-2xl p-4 bg-gray-50/60">
+              <div className="flex-1 space-y-3">
+                {(showAllQuotationVersions ? sortedQuotationVersions : sortedQuotationVersions.slice(0, 3)).map((version, idx) => (
+                  <div
+                    key={version.id}
+                    className={`border rounded-2xl p-4 ${idx === 0 ? 'border-jira-blue/30 bg-blue-50/50' : 'border-gray-100 bg-gray-50/60'}`}
+                  >
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-jira-gray truncate">{version.pdfName || 'Quotations.pdf'}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold text-jira-gray truncate">{version.pdfName || 'Quotations.pdf'}</p>
+                          {idx === 0 && (
+                            <span className="flex-shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-jira-blue text-white">
+                              Current
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-gray-500 mt-1">
                           {version.generatedAt ? new Date(version.generatedAt).toLocaleString() : 'Unknown date'}
                         </p>
                       </div>
-                      <div className="flex items-center gap-4 text-jira-blue font-semibold text-sm">
+                      <div className="flex items-center gap-4 text-jira-blue font-semibold text-sm flex-shrink-0">
                         <button
                           type="button"
                           onClick={() => handleViewOldVersion(version)}
-                          className="hover:underline"
+                          className="hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                           disabled={!version.pdfAvailable}
                         >
                           View
@@ -481,7 +491,7 @@ const Summary = () => {
                         <button
                           type="button"
                           onClick={() => handleDownloadOldVersion(version)}
-                          className="hover:underline"
+                          className="hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                           disabled={!version.pdfAvailable}
                         >
                           Download
@@ -491,6 +501,17 @@ const Summary = () => {
                   </div>
                 ))}
               </div>
+              {sortedQuotationVersions.length > 3 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllQuotationVersions(prev => !prev)}
+                  className="mt-4 w-full py-2.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-sm font-semibold text-gray-600 transition-colors"
+                >
+                  {showAllQuotationVersions
+                    ? 'View Less'
+                    : `View More (${sortedQuotationVersions.length - 3} more)`}
+                </button>
+              )}
             </div>
           )}
         </div>
