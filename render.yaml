@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: projectflow-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGODB_URI
+        sync: false   # Set in Render dashboard → Environment
+      - key: JWT_SECRET
+        sync: false   # Set in Render dashboard → Environment
+      - key: CLIENT_ORIGIN
+        sync: false   # Set to your Vercel frontend URL, e.g. https://your-app.vercel.app
+      - key: ADMIN1_USERNAMES
+        sync: false   # Comma-separated FULL_ACCESS usernames, e.g. phani,admin1
+      - key: ADMIN2_USERNAMES
+        sync: false   # Comma-separated TASK_EDITOR usernames, e.g. admin2
+      - key: ADMIN4_USERNAMES
+        sync: false   # Comma-separated PROJECT_READ_ONLY usernames, e.g. admin4
+      - key: ALLOW_VERCEL_PREVIEWS
+        value: false  # Set to true to allow all *.vercel.app preview URLs

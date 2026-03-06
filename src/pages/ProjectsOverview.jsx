@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import ProjectModal from '../components/ProjectModal';
 
 const ProjectsOverview = () => {
-  const { projects, getTasksByProject, deleteProject, updateProject } = useData();
+  const { projects, loading, getTasksByProject, deleteProject, updateProject } = useData();
   const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -82,7 +82,12 @@ const ProjectsOverview = () => {
 
       {/* Projects Grid */}
       <div className="max-w-7xl mx-auto px-8 py-8">
-        {projects.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-20" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+            <div className="w-12 h-12 border-4 border-blue-200 border-t-jira-blue rounded-full animate-spin mx-auto mb-6" />
+            <p className="text-gray-500 text-lg dark:text-gray-400">Loading projects...</p>
+          </div>
+        ) : projects.length === 0 ? (
           <div className="text-center py-20" style={{ animation: 'fadeIn 0.5s ease-out' }}>
             <Folder className="w-24 h-24 text-gray-300 mx-auto mb-6 animate-pulse" />
             <h3 className="text-2xl font-semibold text-gray-600 mb-3 dark:text-gray-200">No projects yet</h3>

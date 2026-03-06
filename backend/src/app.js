@@ -18,8 +18,20 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || '')
   .filter(Boolean);
 const corsOrigins = allowedOrigins.length ? allowedOrigins : [defaultOrigin];
 
+// Dynamic origin check: supports explicit list + optional Vercel preview URLs
+const isAllowedOrigin = (origin, callback) => {
+  // Server-to-server requests (Vercel proxy) have no Origin — allow them
+  if (!origin) return callback(null, true);
+  if (corsOrigins.includes(origin)) return callback(null, true);
+  // Allow all Vercel preview/branch deployments when opt-in env var is set
+  if (process.env.ALLOW_VERCEL_PREVIEWS === 'true' && /\.vercel\.app$/.test(origin)) {
+    return callback(null, true);
+  }
+  return callback(new Error(`CORS: origin ${origin} not allowed`));
+};
+
 app.use(cors({
-  origin: corsOrigins,
+  origin: isAllowedOrigin,
   credentials: true,
 }));
 app.use(cookieParser());

@@ -14,12 +14,11 @@ const withFallback = (primary, fallback) => {
 
 const DEFAULT_GROUPS = [
   // Seed allowlist usernames for initial bootstrap.
-  // Configure these per environment (Azure Static Web Apps -> Environment variables).
-  // Example values:
-  //   ADMIN1_USERNAMES=phani,anand
-  //   ADMIN2_USERNAMES=admin2
-  //   ADMIN4_USERNAMES=viewer1
-  // If not provided, it falls back to the legacy defaults (admin1/admin2/admin4).
+  // Configure via Render environment variables:
+  //   ADMIN1_USERNAMES=phani,admin1    ← FULL_ACCESS users
+  //   ADMIN2_USERNAMES=admin2          ← TASK_EDITOR users
+  //   ADMIN4_USERNAMES=admin4          ← PROJECT_READ_ONLY users
+  // If not provided, falls back to the legacy defaults (admin1/admin2/admin4).
   { key: 'admin1', usernames: withFallback(process.env.ADMIN1_USERNAMES, ['admin1']) },
   { key: 'admin2', usernames: withFallback(process.env.ADMIN2_USERNAMES, ['admin2']) },
   { key: 'admin3', usernames: [] },
