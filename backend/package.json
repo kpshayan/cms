@@ -4,6 +4,7 @@
   "description": "Express + MongoDB API for ProjectFlow",
   "main": "src/server.js",
   "scripts": {
+    "build": "echo 'No build step'",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js"
   },
